@@ -6,12 +6,10 @@
 
 | Item | Details |
 |---|---|
-| Group ID | G7 |
+| Group ID | G2 |
 | Project Name | Car Sales System |
 | Business Domain | Automotive / Car Sales |
-| Repository Link | |
-| W5 Evidence Pack Link | |
-| Presentation Date | |
+| Presentation Date |22/05/2026 |
 
 ---
 
@@ -38,11 +36,15 @@
 
 ### Application Description
 
-> Describe the car sales system, target users, and core business functions.
+The project is a cloud-based car sales management system designed to support vehicle dealerships and customers through a scalable and intelligent web platform. The system allows administrators and sales staff to manage vehicle inventory, customer inquiries, and sales operations, while customers can browse available cars, search based on preferences, and interact with an AI-powered chatbot for recommendations and support.
 
-### Business Domain
+Target users include:
 
-> Explain the automotive dealership business context.
+- Customers searching for vehicles online
+- Sales staff managing inquiries and transactions
+- System administrators maintaining infrastructure and operations
+
+The platform was designed using AWS cloud-native services with a strong focus on scalability, security, automation, and intelligent customer interaction.
 
 ### Main Features
 
@@ -51,7 +53,10 @@
 - Customer inquiry management
 - Sales management
 - AI-powered recommendation/chatbot system
-- Other:
+- User authentication and authorization
+- Automated backup and recovery
+- Secure API integration
+- Monitoring and operational logging
 
 ---
 
@@ -59,29 +64,183 @@
 
 ### W1 — Core Architecture
 
-> Describe the original 3-tier architecture design.
+The initial architecture followed a standard 3-tier cloud architecture:
+
+1. Presentation Layer
+   - Frontend web application hosted behind CloudFront and Application Load Balancer (ALB)
+   - Public access handled through secure HTTPS routing
+
+2. Application Layer
+   - EC2 instances deployed in private subnets
+   - Auto Scaling Group used for scalability and high availability
+   - Application logic processed through Node.js backend services
+
+3. Data Layer
+   - Database services isolated inside private subnets (using DocumentDB)
+   - Storage and persistent services separated from application instances
+
+The architecture was distributed across multiple Availability Zones to improve fault tolerance and availability.
 
 ### W2 — Storage & Identity
 
-> Describe storage services and IAM/security setup.
+Week 2 focused on storage configuration and identity/security management.
+
+Storage services implemented:
+
+- Amazon EBS for EC2 persistent storage
+- Amazon EFS for shared file storage across multiple EC2 instances
+- Amazon S3 for static assets, backup files, and storage operations
+
+Identity and security setup included:
+
+- IAM Roles for EC2, Lambda, and application services
+- Least-privilege access policies
+- Security Groups and NACL configuration
+- Secure access control between frontend, backend, and database layers
+- Controlled resource permissions using IAM policies
+
+This week established the foundation for secure infrastructure operations and shared storage management.
 
 ### W3 — Database & AI Layer
 
-> Describe database, AI services, Bedrock, Lambda, or knowledge base integration.
+Week 3 introduced the database infrastructure and AI-powered application layer.
+
+Implemented services included:
+
+- Amazon DocumentDB for application database storage
+- AWS Lambda functions for serverless backend processing
+- Amazon Bedrock integration for generative AI capabilities
+- Knowledge Base integration for chatbot retrieval and contextual responses
+
+#### Database Layer
+
+Amazon DocumentDB was used as the primary database service for storing:
+
+- Vehicle inventory data
+- Customer inquiries
+- Sales-related information
+
+The database was deployed inside private subnets within the VPC to improve security and isolate backend resources from direct public access.
+
+#### AI & Automation Layer
+
+The intelligent application layer integrated Amazon Bedrock with backend Lambda functions to support AI-powered customer interactions.
+
+Implemented AI capabilities included:
+
+- Vehicle recommendation support
+- Context-aware chatbot responses
+- Retrieval-Augmented Generation (RAG)
+- Knowledge Base querying
+- Backend orchestration using Lambda functions
+
+This architecture enabled intelligent customer support and automated recommendation functionality while maintaining scalable and serverless backend operations.
 
 ### W4 — Intelligent Automation
 
-> Describe agent tools, memory, retrieval strategy, orchestration, etc.
+Week 4 focused on building the AI chatbot and intelligent orchestration system.
+
+The chatbot system included:
+
+- Bedrock Agent integration
+- Retrieval-based response generation
+- Knowledge Base querying
+- Lambda-powered tool execution
+- Multi-step orchestration workflow
+
+Core chatbot capabilities:
+
+- Vehicle recommendation assistance
+- Customer support automation
+- Contextual conversation handling
+- Intelligent retrieval from stored data
+- API-based action execution using Lambda tools
+
+Agent workflow architecture:
+
+1. User submits a request
+2. Bedrock Agent processes intent
+3. Knowledge Base retrieves related information
+4. Lambda tools execute backend operations if required
+5. Final response is generated and returned to the user
+
+The system improved customer interaction by automating responses and reducing manual support workload.
 
 ### W5 — Network Hardening
 
-> Describe VPC, firewall, API Gateway, backup/restore, scaling, and security improvements.
+Week 5 focused on operational security, backup strategy, and network protection.
+
+Implemented improvements included:
+
+#### Network Security
+
+- VPC segmentation across multiple Availability Zones
+- Public and private subnet isolation
+- AWS Network Firewall integration
+- Secure routing through inspection layers
+- NAT Gateway configuration for outbound traffic
+
+#### API & Access Security
+
+- API Gateway integration for controlled API exposure
+- Usage plans and throttling configuration
+- IAM-based permission control
+- Secure communication between services
+
+#### Backup & Restore
+
+- AWS Backup Plan implementation
+- EBS snapshot automation
+- EFS backup and restore validation
+- Data recovery testing and integrity verification
+
+#### Scalability & Reliability
+
+- Auto Scaling Group configuration
+- Load balancing using Application Load Balancer
+- Multi-AZ deployment for high availability
+- Monitoring and logging preparation for operational visibility
+
+The infrastructure was hardened to improve resilience against network threats, operational failures, and scaling challenges.
 
 ---
 
-## 1.3 W5 Feedback Improvements (Optional)
+## 1.3 W5 Feedback Improvements 
 
-> Mention any W5 feedback resolved this week.
+Several issues identified during the W5 review were resolved and improved:
+
+### Backup & Restore Improvements
+
+- Replaced placeholder EBS volumes with actual tagged production volumes inside the backup plan
+- Updated backup selection strategy to automatically include newly created instances during scale-out
+- Re-ran restore validation to ensure restored data matched original written files
+- Verified backup integrity after restore testing
+
+### Network Firewall Improvements
+
+- Extended AWS Network Firewall coverage beyond Zone A
+- Removed direct outbound NAT access from private subnets in other Availability Zones
+- Improved inspection routing consistency across multi-AZ architecture
+
+### IAM & Secrets Management Improvements
+
+- Removed database connection strings from Lambda environment variables
+- Integrated AWS Secrets Manager for secure secret retrieval
+- Updated IAM permissions to allow secure runtime access to secrets
+
+### Concurrency & API Optimization
+
+- Increased Lambda Reserved Concurrency after measuring baseline traffic
+- Adjusted concurrency configuration to align with API Gateway usage plan limits
+- Reduced risk of unintended request throttling during higher traffic loads
+
+### Documentation & Testing Improvements
+
+- Added CloudFront user-flow screenshots for frontend access validation
+- Standardized testing documentation terminology from:
+  - “Expected Result”
+  to
+  - “Observed Result”
 
 ---
 
@@ -95,7 +254,7 @@
 |---|---|---|
 | Owner | teamlead@email.com | Resource ownership |
 | Environment | dev | Environment identification |
-| CostCenter | G7 | Team cost tracking |
+| CostCenter | G2 | Team cost tracking |
 | Application | CarSalesSystem | Application grouping |
 
 ---
@@ -106,7 +265,7 @@
 |---|---|
 | Owner | |
 | Environment | dev, test, prod |
-| CostCenter | G7 |
+| CostCenter | G2 |
 | Application | CarSalesSystem |
 
 ---
