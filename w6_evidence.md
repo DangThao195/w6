@@ -1644,4 +1644,18 @@ Repo Link: https://github.com/tuu-ngo/car-showroom-aws/blob/main/infra/w6-self-h
 
 ## 8.2 "Wasteful → changed" reflection
 
-"During the architecture review, Group G2 identified two major areas of financial waste in our redeployed stack. First, utilizing standard gp2 EBS volumes for our backend instances dynamically throttled our baseline performance to only 150 IOPS while costing $0.10/GB/month. Second, keeping multiple development instances like car-backend-huutai-a (i-01669f35cc53b5899) running idle 24/7 generated unnecessary compute billing. To eliminate this waste, we used Elastic Volumes to migrate our 50GB storage tier to gp3, immediately upgrading the baseline to a free 3000 IOPS and dropping the unit price to $0.08/GB/month (a 20% cost reduction). Additionally, we deployed the CostGuard_Stop_Compute Lambda automation to forcefully shut down non-compliant running nodes. These combined changes yielded an immediate cost delta, saving $1.00/month per volume and dropping idle compute expenses to zero."
+"During the architecture review, Group G2 identified two major areas of financial waste in our redeployed stack. First, utilizing standard **`gp2` EBS volumes** for our backend instances dynamically throttled our baseline performance to only **150 IOPS** while costing **$0.10/GB/month**. Second, keeping multiple development instances like **`car-backend-huutai-a` (`i-01669f35cc53b5899`)** running idle 24/7 generated unnecessary compute billing. 
+
+To eliminate this waste, we used Elastic Volumes to migrate our 50GB storage tier to **`gp3`**, immediately upgrading the baseline to a free **3000 IOPS** and dropping the unit price to **$0.08/GB/month** (a **20% cost reduction**). Additionally, we deployed the `CostGuard_Stop_Compute` Lambda automation to forcefully shut down non-compliant running nodes. These combined changes yielded an immediate cost delta, saving **$1.00/month** per volume and dropping idle compute expenses to zero."
+
+---
+
+### Key Optimization Metrics Summary
+
+| Resource Attribute | Before State (`gp2` / Manual) | After State (`gp3` / Automated) | Metric Delta & Savings |
+| :--- | :--- | :--- | :--- |
+| **Storage Provisioning Type** | `gp2` General Purpose | `gp3` General Purpose | **Modernized Storage Tier** |
+| **Baseline Performance** | 150 IOPS *(Bound to size)* | 3000 IOPS *(Complimentary baseline)* | **+1,900% Performance Surge** |
+| **Storage Unit Pricing** | $0.10 / GB / month | $0.08 / GB / month | **20% Cost Reduction** |
+| **50GB Volume Cost** | $5.00 / month | $4.00 / month | **-$1.00 / month savings per volume** |
+| **Compute Idle State** | Running 24/7 (Wasteful) | Automated Shutdown via Cron | **Compute waste reduced to $0.00** |
