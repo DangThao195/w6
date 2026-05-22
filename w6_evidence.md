@@ -417,8 +417,8 @@ No administrative, destructive, or modification rights (such as `ec2:TerminateIn
 ### Lambda Screenshot
 
 ![alt text](image-21.png)
-![alt text](image-22.png)
 ![alt text](image-23.png)
+![alt text](ec2_before.png)
 ![alt text](image-24.png)
 
 ---
