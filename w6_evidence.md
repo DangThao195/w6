@@ -1115,7 +1115,7 @@ def lambda_handler(event, context):
 
 ### Dashboard Overview
 
-The **CarSales-Performance-Dashboard** is designed to provide a comprehensive view of the health and operational efficiency of the vehicle search system. It integrates both core Infrastructure Metrics and custom Application Performance Metrics to enable rapid anomaly detection and proactive troubleshooting.
+The **CarSales-Performance-Dashboard** is designed to provide a comprehensive view of the health and operational efficiency of **the vehicle search system**. It integrates both core Infrastructure Metrics and custom Application Performance Metrics to enable rapid anomaly detection and proactive troubleshooting.
 
 The dashboard includes the following widgets:
 
