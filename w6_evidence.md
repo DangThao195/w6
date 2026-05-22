@@ -1353,6 +1353,10 @@ Account-Level S3 Block Public Access: Offered as a native, built-in governance p
 
 IAM Bucket Policy Modification: Evaluating structural conditions (aws:SecureTransport) occurs natively inside the AWS IAM policy validation layer and does not generate transactional billing charges.
 
+Implementing a dedicated Customer Managed Key (CMK) introduces a predictable, flat structural fee of **USD 1.00 per month** for storing the baseline cryptographic key material inside the regional AWS KMS repository. 
+
+Additionally, nominal transactional variable costs are accumulated based on the volume of KMS API requests (such as `GenerateDataKey` and `Decrypt`) processed during file upload and download operations.
+
 ---
 
 ### Business Justification
@@ -1360,6 +1364,15 @@ IAM Bucket Policy Modification: Evaluating structural conditions (aws:SecureTran
 The zero-cost profile yields an exceptionally high security return on investment (ROI). Data leaks stemming from exposed S3 static hosting origins represent one of the most common vectors for corporate data exposure. Enforcing centralized account blocks and mandatory TLS encryption completely neutralizes accidental public access vectors and wiretapping risks.
 
 The minimal operational friction—ensuring that deployment pipelines communicate explicitly over TLS-enabled endpoints—is a standard best practice that guarantees the integrity of our front-end distribution.
+
+While default AWS-managed keys (`SSE-S3`) are provided completely free of charge, they operate as shared infrastructure and lack the granular access boundaries required for an enterprise-grade car sales system. 
+
+The minimal fee associated with the custom CMK is thoroughly justified by the following business advantages:
+1. **Granular Audit Mapping:** Provides distinct, resource-isolated execution audit trails inside AWS CloudTrail, making it simple to track exactly who accessed which data blocks.
+2. **Instant Blast Radius Containment:** In the event of a credential exposure or security anomaly, security administrators can execute an immediate programmatic shutdown (disabling the key). This instantaneously neutralizes the exposed data store at rest, rendering the files unreadable to attackers.
+3. **Compliance Readiness:** Supports automated annual cryptographic rotation natively, checking off mandatory security compliance boxes for cloud-native applications. 
+
+Furthermore, the strategic adoption of the **S3 Bucket Key** sub-feature safely suppresses unnecessary API transactional costs, achieving a highly optimized, production-ready balance between data protection and budget guardrails.
 
 ---
 
