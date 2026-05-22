@@ -62,6 +62,8 @@ The platform was designed using AWS cloud-native services with a strong focus on
 
 ## 1.2 Architecture Summary (W1 → W5)
 
+![alt text](image-66.png)
+
 ### W1 — Core Architecture
 
 The initial architecture followed a standard 3-tier cloud architecture:
@@ -454,7 +456,6 @@ In a production enterprise environment, maintaining manual tag compliance is hig
 * **Configuration:** * **Date Range:** Month-to-Date (MTD) / Last 7 Days.
     * **Granularity:** Daily.
     * **Dimension / Group by:** Service.
-    * **Filter applied:** Tag: `Application = AAP-CarApp`.
 
 ![alt text](image-37.png)
 
@@ -1251,11 +1252,33 @@ Once triggered, the Lambda function captured the state configuration, isolated t
 
 ## Selected Path
 
-- [ ] Path A — KMS Customer Managed Key
+- [x] Path A — KMS Customer Managed Key
 - [x] Path B — S3 Block Public Access + Deny Policy
 - [ ] Path C — IAM Access Analyzer
 
 ---
+
+## Path A — KMS Customer Managed Key
+
+### CMK Configuration
+
+| Setting | Value |
+| ---------------- | ----- |
+| **Key Alias** | `alias/carsales-s3-prod-key` |
+| **Rotation Enabled** | `True (Enabled)` |
+| **Applied Service** | `Amazon S3 (Bucket: s3-kms-131234)` |
+
+---
+
+### Encryption Usage Evidence
+![alt text](image-58.png)
+![alt text](image-59.png)
+![alt text](image-60.png)
+![alt text](image-61.png)
+![alt text](image-62.png)
+![alt text](image-63.png)
+![alt text](image-64.png)
+![alt text](image-65.png)
 
 ## Path B — S3 Block Public Access + Deny Policy
 
