@@ -1166,12 +1166,20 @@ To enforce proper separation of duties and contain blast radius risks, the Lambd
 * **`ec2:RevokeSecurityGroupIngress`**: Permission to surgically strip out non-compliant ingress rules.
 * **`logs:CreateLogGroup` / `logs:CreateLogStream` / `logs:PutLogEvents`**: Core logging capabilities for auditing and historical trail preservation.
 
+![alt text](image-70.png)
+![alt text](image-71.png)
+
+The Lambda does not use AdministratorAccess. This reduces blast radius because the function can only describe Security Groups, revoke insecure ingress rules, and write logs.
+
 ---
 
 ### Lambda Screenshot
 
 ![alt text](image-43.png)
 ![alt text](image-44.png)
+![alt text](image-67.png)
+![alt text](image-68.png)
+![alt text](image-69.png)
 ![alt text](image-47.png)
 
 ---
@@ -1191,10 +1199,12 @@ The execution is wired to an **Amazon EventBridge Scheduler** cron policy. For t
 
 ---
 
-### Trigger Screenshot
+### Schedule Setting
 
 ![alt text](image-48.png)
+![alt text](image-72.png)
 ![alt text](image-49.png)
+
 
 ---
 
@@ -1290,6 +1300,8 @@ To proactively neutralize the risk of accidental bucket exposure via misconfigur
 3. Block public bucket policies for new buckets.
 4. Block public and cross-account access for buckets with public policies.
 
+![alt text](image-73.png)
+
 ---
 
 ### Bucket Policy
@@ -1335,6 +1347,11 @@ To proactively neutralize the risk of accidental bucket exposure via misconfigur
 ---
 
 ### Denied Request Evidence
+
+HTTPS upload → Success
+HTTP upload using --endpoint-url http://s3.us-west-2.amazonaws.com → AccessDenied
+The bucket policy contains two controls:
+
 
 ![alt text](image-53.png)
 ![alt text](image-54.png)
@@ -1486,3 +1503,5 @@ If an administrative firewall opening matches either criteria, the function bypa
 
 ![alt text](image-56.png)
 ![alt text](image-57.png)
+ 
+Repo Link: https://github.com/tuu-ngo/car-showroom-aws/blob/main/infra/w6-self-healing-security-guard.yaml 
