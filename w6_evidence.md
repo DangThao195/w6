@@ -217,15 +217,18 @@ Several issues identified during the W5 review were resolved and improved:
 - Verified backup integrity after restore testing
 
 **Vault - Backup Plan - Restore Job**
+
 ![alt text](image-6.png)
 ![alt text](image-7.png)
 ![alt text](image-8.png)
 
 **EFS Restore**
+
 ![alt text](image-5.png)
 ![alt text](image-4.png)
 
 **ABS Restore**
+
 ![alt text](image-1.png)
 ![alt text](image-2.png)
 ![alt text](image-3.png)
@@ -480,7 +483,7 @@ In a production enterprise environment, maintaining manual tag compliance is hig
 
 ---
 
-## 2.5 Baseline Cost Breakdown
+## 2.4 Baseline Cost Breakdown
 
 ### Cost Breakdown Screenshot
 
