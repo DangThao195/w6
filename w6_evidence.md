@@ -4,29 +4,29 @@
 
 # Group Information
 
-| Item | Details |
-|---|---|
-| Group ID | G2 |
-| Project Name | Car Sales System |
-| Business Domain | Automotive / Car Sales |
-| Presentation Date |22/05/2026 |
+| Item              | Details                |
+| ----------------- | ---------------------- |
+| Group ID          | G2                     |
+| Project Name      | Car Sales System       |
+| Business Domain   | Automotive / Car Sales |
+| Presentation Date | 22/05/2026             |
 
 ---
 
 # Team Members
 
-| Name | Student ID |
-|---|---|
-| Ngo Huu Tai | XB-DN26-008 |
-| Mai Phuoc Khoa | XB-DN26-033 |
+| Name                    | Student ID  |
+| ----------------------- | ----------- |
+| Ngo Huu Tai             | XB-DN26-008 |
+| Mai Phuoc Khoa          | XB-DN26-033 |
 | Nguyen Tien Hoang Thinh | XB-DN26-047 |
-| Dang Thi Ngoc Thao | XB-DN26-055 |
-| Nguyen Phu Trieu | XB-DN26-070 |
-| Nguyen Hung Thinh | XB-DN26-077 |
-| Huynh Ba Huan | XB-DN26-106 |
-| Nguyen Van Tuan Anh | XB-DN26-112 |
-| Le Hoang Viet | XB-DN26-134 |
-| Hoang Cong Tri Dung | XB-DN26-148 |
+| Dang Thi Ngoc Thao      | XB-DN26-055 |
+| Nguyen Phu Trieu        | XB-DN26-070 |
+| Nguyen Hung Thinh       | XB-DN26-077 |
+| Huynh Ba Huan           | XB-DN26-106 |
+| Nguyen Van Tuan Anh     | XB-DN26-112 |
+| Le Hoang Viet           | XB-DN26-134 |
+| Hoang Cong Tri Dung     | XB-DN26-148 |
 
 ---
 
@@ -205,7 +205,7 @@ The infrastructure was hardened to improve resilience against network threats, o
 
 ---
 
-## 1.3 W5 Feedback Improvements 
+## 1.3 W5 Feedback Improvements
 
 Several issues identified during the W5 review were resolved and improved:
 
@@ -260,7 +260,7 @@ Several issues identified during the W5 review were resolved and improved:
 - Added CloudFront user-flow screenshots for frontend access validation
 - Standardized testing documentation terminology from:
   - “Expected Result”
-  to
+    to
   - “Observed Result”
 
 ---
@@ -271,23 +271,23 @@ Several issues identified during the W5 review were resolved and improved:
 
 ### Required Tag Keys
 
-| Tag Key | Example Value | Purpose |
-|---|---|---|
-| Owner | teamlead@email.com | Resource ownership |
-| Environment | dev | Environment identification |
-| CostCenter | G2 | Team cost tracking |
-| Application | CarSalesSystem | Application grouping |
+| Tag Key     | Example Value      | Purpose                    |
+| ----------- | ------------------ | -------------------------- |
+| Owner       | teamlead@email.com | Resource ownership         |
+| Environment | dev                | Environment identification |
+| CostCenter  | G2                 | Team cost tracking         |
+| Application | CarSalesSystem     | Application grouping       |
 
 ---
 
 ### Allowed Tag Values
 
-| Tag Key | Allowed Values |
-|---|---|
-| Owner | |
+| Tag Key     | Allowed Values  |
+| ----------- | --------------- |
+| Owner       |                 |
 | Environment | dev, test, prod |
-| CostCenter | G2 |
-| Application | CarSalesSystem |
+| CostCenter  | G2              |
+| Application | CarSalesSystem  |
 
 ---
 
@@ -351,10 +351,10 @@ Several issues identified during the W5 review were resolved and improved:
 ### Top Cost Drivers
 
 | Rank | Service | Estimated Cost | Observation |
-|---|---|---|---|
-| 1 | | | |
-| 2 | | | |
-| 3 | | | |
+| ---- | ------- | -------------- | ----------- |
+| 1    |         |                |             |
+| 2    |         |                |             |
+| 3    |         |                |             |
 
 ---
 
@@ -366,166 +366,454 @@ Several issues identified during the W5 review were resolved and improved:
 
 # Section 3 — MH-COST-A — Cost Control & Action
 
-## 3.1 Automated Cost Guard Overview
+## 3.1 Objective
 
-### Purpose
+The goal of **MH-COST-A** is to prove that our system does not only observe cloud cost, but can also automatically take action to reduce unnecessary spending.
 
-The **Automated Cost Guard** mechanism is established to implement strict, automated financial governance over the cloud compute infrastructure. Its primary objective is to eliminate cost leakage caused by idle or untagged development resources left running inadvertently. By continuously scanning and enforcing resource tagging policies, the system ensures that only explicitly approved, production-critical workloads consume budget, effectively operating as an automated cost barrier.
+For this workload, we implemented an **Automated Cost Guard** using AWS Lambda. The Lambda function scans running EC2 instances and automatically stops compute resources that should not continue running in a development environment.
 
----
+The cost guard is connected to two trigger paths:
 
-## 3.2 Stop Lambda Function
+```text
+Path 1 — Scheduled cost control
 
-### Lambda Description
+EventBridge Scheduler
+→ CostGuard_Stop_Compute Lambda
+→ Stop EC2 instances without keep=true
+```
 
-The **`CostGuard_Stop_Compute`** is a dedicated Python-based AWS Lambda function utilizing the `boto3` SDK. It is engineered to perform automated infrastructure auditing on a scheduled cron basis (via Amazon EventBridge). The function discovers non-compliant compute resources, assesses their resource tags against corporate cost policies, and immediately orchestrates shutdown commands to prevent unnecessary billing accumulation.
+```text
+Path 2 — Cost-driven control
 
-### Target Resources
+AWS Budget $150
+→ SNS Topic
+→ CostGuard_Stop_Compute Lambda
+→ Stop EC2 instances without keep=true
+```
 
-- [x] EC2
-- [ ] RDS
-- [ ] Other:
-
----
-
-### Lambda Logic
-
-The execution logic of the Lambda function operates on a **strict inclusion/exclusion filtering strategy**:
-
-1. **Discovery Stage:** The function executes a query to retrieve all EC2 instances currently in the `Running` state across the designated region.
-2. **Tag Inspection Stage:** For every active instance discovered, the function evaluates its Metadata Tags, specifically searching for a protection key-value pair defined as:
-   * **Key:** `keep`
-   * **Value:** `true`
-3. **Execution & Exemption Routing:**
-   * **Violation Found (Stop Action):** If an instance **lacks** the `keep=true` tag, the system flags it as a cost violation. It outputs a log stating `"Stopping EC2... Missing 'keep=true' tag"` and invokes the `StopInstances` API to power off the machine. This successfully caught instances **`i-01669f35cc53b5899`** (`car-backend-huutai-a`) and **`i-04caa3aea23b844ed`**.
-   * **Exemption Granted (Skipping):** If the instance possesses the `keep=true` tag (such as the critical **`bastion-backend-huutai-a`** instance), it is classified as protected. The system logs a `"Protected by 'keep=true' tag"` event and securely skips the instance, leaving it untouched in the `Running` state.
+This proves that our application stack has an operational cost-control mechanism instead of only a passive cost alert.
 
 ---
 
-### IAM Least-Privilege Policy
+## 3.2 Automated Cost Guard Lambda
 
-To ensure maximum security and adhere to the **AWS Principle of Least Privilege**, the IAM Execution Role (`LambdaManageCost`) attached to this Lambda function is stripped of all redundant permissions. It is strictly limited to the following discrete API actions:
+### 3.2.1 Lambda function
 
-* **`ec2:DescribeInstances`**: Granted exclusively to view and read the metadata tags and state of EC2 instances.
-* **`ec2:StopInstances`**: Granted to allow the function to issue shutdown commands to non-compliant instances.
-* **`logs:CreateLogGroup`**, **`logs:CreateLogStream`**, **`logs:PutLogEvents`**: Granted to allow the function to emit execution details to AWS CloudWatch Logs for auditing.
+| Item            | Value                                   |
+| --------------- | --------------------------------------- |
+| Lambda name     | `CostGuard_Stop_Compute`                |
+| Runtime         | Python                                  |
+| AWS SDK         | `boto3`                                 |
+| Target resource | EC2 instances                           |
+| Action          | `StopInstances`                         |
+| Protection rule | Skip EC2 instances with tag `keep=true` |
+| Environment     | `dev`                                   |
+| Application     | `AAP-CarApp`                            |
+| CostCenter      | `G2`                                    |
 
-No administrative, destructive, or modification rights (such as `ec2:TerminateInstances` or `ec2:RunInstances`) are assigned to this role.
+The Lambda function scans all EC2 instances in the `running` state. For each instance, it checks whether the instance has the tag:
 
----
+```text
+keep=true
+```
 
-### Lambda Screenshot
+If the tag is missing, the Lambda treats the instance as a cost-risk resource and stops it using the EC2 `StopInstances` API.
+
+If the tag exists, the Lambda logs the instance as protected and skips it. This prevents important infrastructure such as the bastion host from being stopped accidentally.
+
+### 3.2.2 Lambda code summary
+
+```python
+import boto3
+import logging
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
 
 ![alt text](image-21.png)
 ![alt text](image-23.png)
 ![alt text](ec2_before.jpg)
 ![alt text](image-24.png)
 
----
+    logger.info("Scanning for running EC2 instances...")
 
-## 3.3 EventBridge Scheduled Trigger
+    ec2_response = ec2.describe_instances(
+        Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]
+    )
 
-### Schedule Configuration
+    for reservation in ec2_response.get('Reservations', []):
+        for instance in reservation.get('Instances', []):
+            instance_id = instance['InstanceId']
+            tags = instance.get('Tags', [])
 
-| Setting | Value |
-|---|---|
-| Schedule Type | |
-| Cron Expression | |
-| Trigger Frequency | |
+            has_keep = any(
+                t.get('Key', '').lower() == 'keep'
+                and t.get('Value', '').lower() == 'true'
+                for t in tags
+            )
 
----
+            if not has_keep:
+                logger.info(f"Stopping EC2 {instance_id} - Missing 'keep=true' tag.")
+                ec2.stop_instances(InstanceIds=[instance_id])
+            else:
+                logger.info(f"Skipping EC2 {instance_id} - Protected by 'keep=true' tag.")
 
-### EventBridge Screenshot
+    return {"status": "Automated Cost Guard Executed (EC2 Only)"}
+```
 
-> Insert screenshots of EventBridge rule/scheduler.
+### Evidence
 
----
+![MH-COST-A-01 Lambda code for CostGuard_Stop_Compute](./images/mh-cost-a-01-lambda-code.png)
 
-## 3.4 Demonstrated Automated Stop Action
+![MH-COST-A-02 Lambda manual test succeeded](./images/mh-cost-a-02-lambda-test-success.png)
 
-### Test Scenario
-
-To rigorously validate the operational accuracy of the **`CostGuard_Stop_Compute`** automation, a live target environment containing three active virtual machines was selected for testing. 
-
-The environment profile consists of:
-1. **`car-backend-huutai-a` (Instance ID: `i-01669f35cc53b5899`):** Operating in a `Running` state but intentionally left non-compliant due to a **missing** `keep=true` metadata tag. This acts as the primary violation target.
-2. **Instance ID: `i-04caa3aea23b844ed`:** An un-named utility instance operating in a `Running` state, also **missing** the required protective tagging criteria.
-3. **`bastion-backend-huutai-a`:** A critical infrastructure asset explicitly configured with the compliant **`keep=true`** key-value tag pair. This serves as the control subject to verify that the Lambda function correctly filters and exempts authorized, business-critical workloads.
-
-The test execution was initiated via a manual trigger of the Lambda function to simulate an automated policy enforcement interval.
-
----
-
-### Before State
-
-![alt text](image-29.png)
+![MH-COST-A-03 Lambda CloudWatch logs showing scanned and stopped EC2](./images/mh-cost-a-03-lambda-logs-stop-ec2.png)
 
 ---
 
-### After State
+## 3.3 IAM Least-Privilege Role
 
-![alt text](image-30.png)
+The Lambda function uses a dedicated IAM role with only the permissions required for this cost guard.
 
----
+Required permissions:
 
-### CloudTrail Evidence
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DescribeEC2Instances",
+      "Effect": "Allow",
+      "Action": ["ec2:DescribeInstances"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "StopEC2Instances",
+      "Effect": "Allow",
+      "Action": ["ec2:StopInstances"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "WriteCloudWatchLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:*:*:*"
+    }
+  ]
+}
+```
 
-![alt text](image-25.png)
-![alt text](image-26.png)
-![alt text](image-27.png)
-![alt text](image-28.png)
+This role does not use `AdministratorAccess`. It only allows the Lambda to describe EC2 instances, stop EC2 instances, and write logs to CloudWatch.
 
----
+### Evidence
 
-## 3.5 Budget-Driven Automation
+![MH-COST-A-04 Lambda IAM role least privilege policy](./images/mh-cost-a-04-iam-least-privilege-policy.png)
 
-### AWS Budget Configuration
-
-| Setting | Value |
-|---|---|
-| Budget Type | |
-| Budget Limit | $150 |
-| Notification Threshold | |
-
----
-
-### SNS Integration
-
-> Describe SNS topic and subscription setup.
-
----
-
-### Lambda Integration
-
-> Explain how SNS triggers the Lambda.
-
----
-
-### Test Message Demonstration
-
-> Insert screenshots of SNS test publish and automation result.
-
----
-
-## 3.6 Cost Data Latency ADR
-
-### ADR Title
-
-> Cost Data Delay in AWS Budgets
+![MH-COST-A-05 Lambda execution role attached to CostGuard_Stop_Compute](./images/mh-cost-a-05-lambda-execution-role.png)
 
 ---
 
-### Problem
+## 3.4 Component (b) — Daily EventBridge Schedule
 
-> Explain AWS cost reporting delay.
+To make the cost guard automatic, we configured an EventBridge Scheduler rule to invoke the Lambda every day.
+
+| Item                | Value                                                |
+| ------------------- | ---------------------------------------------------- |
+| Scheduler name      | `cost-guard-daily-schedule`                          |
+| Target              | `CostGuard_Stop_Compute`                             |
+| Schedule type       | Recurring                                            |
+| Schedule expression | Daily cron                                           |
+| Purpose             | Automatically stop unprotected dev compute resources |
+| State               | Enabled                                              |
+
+Example production behavior:
+
+```text
+Every day at the scheduled time
+→ EventBridge invokes CostGuard_Stop_Compute
+→ Lambda scans EC2 running instances
+→ Lambda stops EC2 instances without keep=true
+```
+
+This prevents development EC2 instances from running idle overnight and helps keep the weekly account cost under the $150 cap.
+
+### Evidence
+
+![MH-COST-A-06 EventBridge daily schedule overview](./images/mh-cost-a-06-eventbridge-daily-schedule.png)
+
+![MH-COST-A-07 EventBridge schedule target Lambda CostGuard_Stop_Compute](./images/mh-cost-a-07-eventbridge-target-lambda.png)
+
+---
+
+## 3.5 Component (c) — Demonstrated Action
+
+### 3.5.1 Before state
+
+Before invoking the automation, at least one EC2 instance was running and did not have the protection tag:
+
+```text
+keep=true
+```
+
+Target examples:
+
+| Instance name              | Instance ID           | Initial state | `keep=true` |
+| -------------------------- | --------------------- | ------------- | ----------- |
+| `car-backend-huutai-a`     | `i-01669f35cc53b5899` | Running       | Missing     |
+| Additional unprotected EC2 | `i-04caa3aea23b844ed` | Running       | Missing     |
+
+Protected instance example:
+
+| Instance name              | Instance ID           | State   | Reason                   |
+| -------------------------- | --------------------- | ------- | ------------------------ |
+| `bastion-backend-huutai-a` | `i-0b11cacc05b1a432e` | Running | Protected by `keep=true` |
+
+### Evidence — Before
+
+![MH-COST-A-08 EC2 before automation running state](./images/mh-cost-a-08-ec2-before-running.png)
+
+![MH-COST-A-09 EC2 tag view showing missing keep tag or protected keep=true tag](./images/mh-cost-a-09-ec2-tags-keep-true.png)
+
+### 3.5.2 Lambda execution
+
+The Lambda was invoked and scanned running EC2 instances.
+
+The execution log showed two types of behavior:
+
+```text
+Stopping EC2 i-01669f35cc53b5899 - Missing 'keep=true' tag.
+Stopping EC2 i-04caa3aea23b844ed - Missing 'keep=true' tag.
+Skipping EC2 i-0b11cacc05b1a432e - Protected by 'keep=true' tag.
+```
+
+This proves that the Lambda applied selective cost control instead of blindly stopping every instance.
+
+The log evidence for this execution is already captured in:
+
+```text
+mh-cost-a-03-lambda-logs-stop-ec2.png
+```
+
+### 3.5.3 After state
+
+After the Lambda executed, the unprotected EC2 instances moved from `running` to `stopped`.
+
+| Instance name              | Instance ID           | Final state |
+| -------------------------- | --------------------- | ----------- |
+| `car-backend-huutai-a`     | `i-01669f35cc53b5899` | Stopped     |
+| Additional unprotected EC2 | `i-04caa3aea23b844ed` | Stopped     |
+| `bastion-backend-huutai-a` | `i-0b11cacc05b1a432e` | Running     |
+
+The protected bastion instance remained running, proving that the `keep=true` safeguard worked correctly.
+
+### Evidence — After
+
+![MH-COST-A-11 EC2 after automation stopped state](./images/mh-cost-a-11-ec2-after-stopped.png)
+
+---
+
+## 3.6 CloudTrail Evidence — StopInstances
+
+CloudTrail recorded the EC2 `StopInstances` API call.
+
+This proves that the EC2 stop action was performed by AWS automation through the Lambda execution role, not manually by a human user.
+
+Important fields to capture:
+
+| Field              | Expected value                                     |
+| ------------------ | -------------------------------------------------- |
+| Event name         | `StopInstances`                                    |
+| Event source       | `ec2.amazonaws.com`                                |
+| User identity type | `AssumedRole`                                      |
+| Role / session     | Lambda execution role for `CostGuard_Stop_Compute` |
+| Resource           | EC2 instance ID that was stopped                   |
+| AWS Region         | `us-west-2`                                        |
+
+Example CloudTrail lookup command:
+
+```bash
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=StopInstances \
+  --region us-west-2 \
+  --max-results 5
+```
+
+### Evidence
+
+![MH-COST-A-12 CloudTrail Event History filtered by StopInstances](./images/mh-cost-a-12-cloudtrail-stopinstances-list.png)
+
+![MH-COST-A-13 CloudTrail StopInstances event detail](./images/mh-cost-a-13-cloudtrail-stopinstances-detail.png)
+
+![MH-COST-A-14 CloudTrail event record JSON showing Lambda assumed role](./images/mh-cost-a-14-cloudtrail-event-json-assumed-role.png)
+
+---
+
+## 3.7 Component (d) — Cost-Driven Path: AWS Budget → SNS → Lambda
+
+### 3.7.1 AWS Budget
+
+We configured an AWS Budget with a hard workshop cost cap of:
+
+```text
+$150
+```
+
+The budget is connected to SNS so that cost-related events can trigger the same Lambda cost guard.
+
+| Item                | Value                                |
+| ------------------- | ------------------------------------ |
+| Budget name         | `group2-budget` or `W6-150-Cost-Cap` |
+| Budget amount       | `$150`                               |
+| Budget type         | Cost budget                          |
+| Notification type   | Actual cost                          |
+| Notification target | SNS topic                            |
+| SNS topic           | `group2-cost-guard-budget-topic`     |
+
+### Evidence — Budget
+
+![MH-COST-A-15 AWS Budget overview 150 USD](./images/mh-cost-a-15-budget-overview-150.png)
+
+![MH-COST-A-16 AWS Budget alert notification to SNS topic](./images/mh-cost-a-16-budget-sns-notification.png)
+
+---
+
+### 3.7.2 SNS topic and Lambda subscription
+
+The SNS topic is used as the event bridge between AWS Budgets and the Lambda cost guard.
+
+```text
+AWS Budget
+→ SNS topic
+→ CostGuard_Stop_Compute Lambda
+```
+
+| Item                  | Value                                             |
+| --------------------- | ------------------------------------------------- |
+| SNS topic name        | `group2-cost-guard-budget-topic`                  |
+| Topic type            | Standard                                          |
+| Region                | `us-west-2`                                       |
+| Purpose               | Trigger cost guard when budget alert is published |
+| Subscription protocol | AWS Lambda                                        |
+| Subscription endpoint | `CostGuard_Stop_Compute`                          |
+| Subscription status   | Confirmed                                         |
+
+The screenshot for this section includes both the SNS topic overview and the Lambda subscription, so a separate SNS subscription screenshot is not required.
+
+### Evidence — SNS topic and Lambda subscription
+
+![MH-COST-A-17 SNS topic overview and Lambda subscription confirmed](./images/mh-cost-a-17-sns-topic-overview.png)
+
+---
+
+### 3.7.3 Lambda permission for SNS invoke
+
+The Lambda resource policy allows SNS to invoke the function.
+
+Expected principal:
+
+```text
+sns.amazonaws.com
+```
+
+Expected source ARN:
+
+```text
+arn:aws:sns:us-west-2:462972379716:group2-cost-guard-budget-topic
+```
+
+### Evidence
+
+![MH-COST-A-19 Lambda resource policy allows SNS invoke](./images/mh-cost-a-19-lambda-sns-invoke-permission.png)
+
+---
+
+## 3.8 Manual SNS Publish Demonstration
+
+Because AWS Budgets cost data can be delayed, the real Budget threshold may not trigger during the 48-hour workshop window. To prove that the cost-driven automation path is wired correctly, we manually published a test message to the SNS topic.
+
+Command used:
+
+```bash
+aws sns publish \
+  --topic-arn arn:aws:sns:us-west-2:462972379716:group2-cost-guard-budget-topic \
+  --message '{"source":"manual-sns-test","reason":"simulate-budget-alert"}' \
+  --region us-west-2
+```
+
+Expected result:
+
+```text
+SNS publish succeeds
+→ SNS invokes CostGuard_Stop_Compute
+→ Lambda scans running EC2
+→ Lambda stops EC2 instances without keep=true
+→ CloudTrail records StopInstances
+```
+
+The EC2 stopped state is already demonstrated in the main before/after evidence, so an additional EC2 screenshot after SNS publish is not required.
+
+### Evidence — SNS publish
+
+![MH-COST-A-20 Terminal SNS publish message ID](./images/mh-cost-a-20-terminal-sns-publish.png)
+
+![MH-COST-A-21 Lambda invocation after SNS publish](./images/mh-cost-a-21-lambda-invocation-after-sns.png)
+
+![MH-COST-A-22 Lambda logs after SNS publish](./images/mh-cost-a-22-lambda-logs-after-sns-publish.png)
+
+---
+
+## 3.9 ADR — AWS Budgets Cost Data Latency
+
+### Context
+
+AWS Budgets does not always trigger immediately because AWS cost and usage data can be delayed. In a short workshop account that only runs for about 48 hours, the real budget threshold may not fire during the demo window.
 
 ### Decision
 
-> Explain why scheduled automation was added.
+We still wired the production-like path:
 
-### Expected Production Behavior
+```text
+AWS Budget $150
+→ SNS topic
+→ CostGuard_Stop_Compute Lambda
+→ Stop EC2
+```
 
-> Explain production expectations.
+To validate the chain within the workshop timeframe, we manually published a test message to the SNS topic. This simulated a real budget alert event.
+
+### Result
+
+The same Lambda function was invoked through SNS and successfully stopped unprotected EC2 instances. This proves that the cost-driven automation chain works even though the actual AWS Budget alert may not trigger immediately in the lab environment.
+
+### Production behavior
+
+In production, when the actual cost crosses the configured threshold, AWS Budgets would publish to the SNS topic automatically. The same Lambda would then execute and stop non-protected development compute resources to reduce unnecessary cost.
+
+---
+
+## 3.10 Final Summary
+
+The MH-COST-A cost guard demonstrates that our W6 application is cost-aware and operationally controlled.
+
+Instead of only monitoring cost, we implemented an automated action loop:
+
+```text
+Detect cost-risk compute
+→ decide based on keep=true tag
+→ stop unprotected EC2
+→ verify through CloudTrail
+```
+
+The scheduled path prevents daily idle compute waste. The cost-driven path wires AWS Budget $150 to SNS and Lambda, proving that a budget event can trigger the same stop automation.
+
+This implementation helps keep the workshop account under the $150 cost cap and provides a production-ready pattern for controlling development compute cost.
+
+---
 
 ---
 
@@ -551,6 +839,7 @@ The test execution was initiated via a manual trigger of the Lambda function to 
 The **CarSales-Performance-Dashboard** is designed to provide a comprehensive view of the health and operational efficiency of the vehicle search system. It integrates both core Infrastructure Metrics and custom Application Performance Metrics to enable rapid anomaly detection and proactive troubleshooting.
 
 The dashboard includes the following widgets:
+
 1. **CarSearchLatencyMs (Line Widget):** Monitors real-time latency (in milliseconds) when the Lambda function establishes connections and fetches collection data from the Amazon DocumentDB cluster.
 2. **Lambda Duration (Line Widget):** Tracks the average and maximum execution time of the Lambda function to detect potential VPC networking bottlenecks or driver resolution delays.
 3. **Lambda Errors (Line Widget):** Monitors the count of execution failures (crashes or timeouts) to assess overall system stability.
@@ -559,8 +848,8 @@ The dashboard includes the following widgets:
 
 ### Custom Metric Widget
 
-| Metric Name | Namespace | Unit |
-|---|---|---|
+| Metric Name          | Namespace                | Unit         |
+| -------------------- | ------------------------ | ------------ |
 | `CarSearchLatencyMs` | `CarSalesApp/Operations` | Milliseconds |
 
 ---
@@ -605,7 +894,7 @@ latency_ms = int((time.time() - start_time) * 1000)
 
 # Print structured JSON to stdout for CloudWatch Logs Engine to capture $.latency_value
 print(json.dumps({
-    "metric_name": "CarSearchLatencyMs", 
+    "metric_name": "CarSearchLatencyMs",
     "latency_value": latency_ms
 }))
 ```
@@ -616,13 +905,13 @@ print(json.dumps({
 
 ### Alarm Configuration
 
-| Setting | Value |
-|---|---|
-| Alarm Name | Lambda-Errors-Alarm |
-| Metric | Errors (Standard Lambda Metric) |
-| Threshold | Greater/equal (>=) 5 errors within 5 minute |
-| Evaluation Period | 5 minute (Statistic: Sum) |
-| Alarm Action | None / SNS Notification Topic |
+| Setting           | Value                                       |
+| ----------------- | ------------------------------------------- |
+| Alarm Name        | Lambda-Errors-Alarm                         |
+| Metric            | Errors (Standard Lambda Metric)             |
+| Threshold         | Greater/equal (>=) 5 errors within 5 minute |
+| Evaluation Period | 5 minute (Statistic: Sum)                   |
+| Alarm Action      | None / SNS Notification Topic               |
 
 ---
 
@@ -795,11 +1084,11 @@ fields @timestamp, @message
 
 ### CMK Configuration
 
-| Setting | Value |
-|---|---|
-| Key Alias | |
-| Rotation Enabled | |
-| Applied Service | |
+| Setting          | Value |
+| ---------------- | ----- |
+| Key Alias        |       |
+| Rotation Enabled |       |
+| Applied Service  |       |
 
 ---
 
@@ -931,21 +1220,21 @@ fields @timestamp, @message
 
 ### Finding 1
 
-| Item | Details |
-|---|---|
-| Finding | |
-| Action Taken | |
-| Result | |
+| Item         | Details |
+| ------------ | ------- |
+| Finding      |         |
+| Action Taken |         |
+| Result       |         |
 
 ---
 
 ### Finding 2
 
-| Item | Details |
-|---|---|
-| Finding | |
-| Action Taken | |
-| Result | |
+| Item         | Details |
+| ------------ | ------- |
+| Finding      |         |
+| Action Taken |         |
+| Result       |         |
 
 ---
 
