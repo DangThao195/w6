@@ -1294,7 +1294,7 @@ If this car sales infrastructure is transitioned into an enterprise-grade, high-
 
 # Section 8 — Stretch Goals (Optional)
 
-## 8.1 CloudFormation template cho một resource W6
+## 8.1 CloudFormation template for one W6 resource
 
 ### Infrastructure-as-Code (IaC) Justification
 To demonstrate structural maturity, infrastructure-as-code discipline, and prepare the environment for Week 7 deployment pipelines, the entire Week 6 Self-Healing Security Guard infrastructure has been fully codified into an AWS CloudFormation template. This ensures that the detection and automated remediation loop can be reliably destroyed, version-controlled, and redeployed across multiple target AWS accounts with zero configuration drift.
