@@ -370,7 +370,7 @@ Several issues identified during the W5 review were resolved and improved:
 
 ### Purpose
 
-> Explain the automated cost control mechanism.
+The **Automated Cost Guard** mechanism is established to implement strict, automated financial governance over the cloud compute infrastructure. Its primary objective is to eliminate cost leakage caused by idle or untagged development resources left running inadvertently. By continuously scanning and enforcing resource tagging policies, the system ensures that only explicitly approved, production-critical workloads consume budget, effectively operating as an automated cost barrier.
 
 ---
 
@@ -378,31 +378,48 @@ Several issues identified during the W5 review were resolved and improved:
 
 ### Lambda Description
 
-> Describe what the Lambda does.
+The **`CostGuard_Stop_Compute`** is a dedicated Python-based AWS Lambda function utilizing the `boto3` SDK. It is engineered to perform automated infrastructure auditing on a scheduled cron basis (via Amazon EventBridge). The function discovers non-compliant compute resources, assesses their resource tags against corporate cost policies, and immediately orchestrates shutdown commands to prevent unnecessary billing accumulation.
 
 ### Target Resources
 
-- EC2
-- RDS
-- Other:
+- [x] EC2
+- [ ] RDS
+- [ ] Other:
 
 ---
 
 ### Lambda Logic
 
-> Explain stop conditions and filtering logic.
+The execution logic of the Lambda function operates on a **strict inclusion/exclusion filtering strategy**:
+
+1. **Discovery Stage:** The function executes a query to retrieve all EC2 instances currently in the `Running` state across the designated region.
+2. **Tag Inspection Stage:** For every active instance discovered, the function evaluates its Metadata Tags, specifically searching for a protection key-value pair defined as:
+   * **Key:** `keep`
+   * **Value:** `true`
+3. **Execution & Exemption Routing:**
+   * **Violation Found (Stop Action):** If an instance **lacks** the `keep=true` tag, the system flags it as a cost violation. It outputs a log stating `"Stopping EC2... Missing 'keep=true' tag"` and invokes the `StopInstances` API to power off the machine. This successfully caught instances **`i-01669f35cc53b5899`** (`car-backend-huutai-a`) and **`i-04caa3aea23b844ed`**.
+   * **Exemption Granted (Skipping):** If the instance possesses the `keep=true` tag (such as the critical **`bastion-backend-huutai-a`** instance), it is classified as protected. The system logs a `"Protected by 'keep=true' tag"` event and securely skips the instance, leaving it untouched in the `Running` state.
 
 ---
 
 ### IAM Least-Privilege Policy
 
-> Describe permissions granted to the Lambda role.
+To ensure maximum security and adhere to the **AWS Principle of Least Privilege**, the IAM Execution Role (`LambdaManageCost`) attached to this Lambda function is stripped of all redundant permissions. It is strictly limited to the following discrete API actions:
+
+* **`ec2:DescribeInstances`**: Granted exclusively to view and read the metadata tags and state of EC2 instances.
+* **`ec2:StopInstances`**: Granted to allow the function to issue shutdown commands to non-compliant instances.
+* **`logs:CreateLogGroup`**, **`logs:CreateLogStream`**, **`logs:PutLogEvents`**: Granted to allow the function to emit execution details to AWS CloudWatch Logs for auditing.
+
+No administrative, destructive, or modification rights (such as `ec2:TerminateInstances` or `ec2:RunInstances`) are assigned to this role.
 
 ---
 
 ### Lambda Screenshot
 
-> Insert screenshots of Lambda configuration and code.
+![alt text](image-21.png)
+![alt text](image-22.png)
+![alt text](image-23.png)
+![alt text](image-24.png)
 
 ---
 
@@ -428,25 +445,35 @@ Several issues identified during the W5 review were resolved and improved:
 
 ### Test Scenario
 
-> Describe the resource selected for testing.
+To rigorously validate the operational accuracy of the **`CostGuard_Stop_Compute`** automation, a live target environment containing three active virtual machines was selected for testing. 
+
+The environment profile consists of:
+1. **`car-backend-huutai-a` (Instance ID: `i-01669f35cc53b5899`):** Operating in a `Running` state but intentionally left non-compliant due to a **missing** `keep=true` metadata tag. This acts as the primary violation target.
+2. **Instance ID: `i-04caa3aea23b844ed`:** An un-named utility instance operating in a `Running` state, also **missing** the required protective tagging criteria.
+3. **`bastion-backend-huutai-a`:** A critical infrastructure asset explicitly configured with the compliant **`keep=true`** key-value tag pair. This serves as the control subject to verify that the Lambda function correctly filters and exempts authorized, business-critical workloads.
+
+The test execution was initiated via a manual trigger of the Lambda function to simulate an automated policy enforcement interval.
 
 ---
 
 ### Before State
 
-> Insert screenshot showing resource in running state.
+![alt text](image-29.png)
 
 ---
 
 ### After State
 
-> Insert screenshot showing resource stopped by automation.
+![alt text](image-30.png)
 
 ---
 
 ### CloudTrail Evidence
 
-> Insert CloudTrail screenshots for StopInstances or StopDBInstance.
+![alt text](image-25.png)
+![alt text](image-26.png)
+![alt text](image-27.png)
+![alt text](image-28.png)
 
 ---
 
@@ -512,7 +539,7 @@ Several issues identified during the W5 review were resolved and improved:
 - Lambda (CarSales-Search-Service)
 - Database (Amazon DocumentDB)
 - AI Recommendation Layer
-- Vehicle Search Service
+- Vehicle Search Servicef
 - Other: CloudWatch Logs & Metrics Engine
 
 ---
@@ -963,29 +990,3 @@ fields @timestamp, @message
 > Summarize important findings.
 
 ---
-
-# Final Notes
-
-## Repository Commit Information
-
-| Item | Value |
-|---|---|
-| Repository URL | |
-| Commit Hash | |
-| Evidence Pack File | docs/W6_evidence.md |
-
----
-
-## Submission Checklist
-
-- [ ] MH-COST-V completed
-- [ ] MH-COST-A completed
-- [ ] MH-OBS completed
-- [ ] MH-SEC completed
-- [ ] Evidence screenshots added
-- [ ] CloudTrail evidence added
-- [ ] Budget automation tested
-- [ ] Alarm state verified
-- [ ] Cost allocation tags activated
-- [ ] Repository link submitted
-- [ ] Total AWS account cost below $150
