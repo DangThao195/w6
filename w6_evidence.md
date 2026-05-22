@@ -999,13 +999,20 @@ fields @timestamp, @message
 
 ### Security Threat Addressed
 
-> Explain the security misconfiguration detected.
+The security misconfiguration targeted by this automation is the catastrophic public exposure of administrative management ports to the open internet (`0.0.0.0/0`). Specifically, the guard actively monitors and intercepts insecure Security Group ingress rules allowing unconfined inbound traffic over:
+* **SSH (TCP Port 22):** Remote command-line administration for Linux instances.
+* **RDP (TCP Port 3389):** Remote Desktop Protocol for Windows instances.
+
+Leaving these management ports open to the world represents an extreme security risk, inviting automated malicious scanners to execute brute-force attacks, credential-stuffing campaigns, or exploit zero-day remote execution vulnerabilities within core OS daemons.
 
 ---
 
 ### Potential Blast Radius
 
-> Explain production impact if not remediated.
+In a production tier, an unremediated public management port drastically widens the infrastructure's attack surface. The potential blast radius includes:
+* Unauthorized root-level interactive access to backend application compute instances (`car-backend-huutai-a`).
+* Potential side-channel lateral movement across the internal AWS VPC network to compromise private stateful clusters (e.g., Amazon DocumentDB).
+* Ransomware injection, unauthorized data exfiltration, malicious modification of system files, and full operational service disruption.
 
 ---
 
@@ -1013,33 +1020,38 @@ fields @timestamp, @message
 
 ### Lambda Purpose
 
-> Describe remediation logic.
+The **`SecurityGuard_SelfHealing`** Lambda function acts as an automated, continuous compliance officer. It is designed to inspect active Security Group configurations, audit inbound rules against defined compliance bounds, and programmatically strip away any discovered high-risk external entry points without waiting for human operator intervention.
 
 ---
 
 ### Detection Method
 
-- Security Group Detection
-- S3 Public Access Detection
-- Other:
+- [x] Security Group Detection
+- [ ] S3 Public Access Detection
+- [ ] Other:
 
 ---
 
 ### Remediation Action
 
-> Explain how the Lambda fixes the issue.
+Upon identifying a non-compliant ingress rule containing a source CIDR of `0.0.0.0/0` mapped to port 22 or 3389, the Lambda function acts as an active interceptor. It isolates the violating parameters and issues an immediate, targeted programmatic command via the **`RevokeSecurityGroupIngress`** API call. This instantly deletes the dangerous rule from the active security firewall layer, neutralizing the threat vector in near real-time.
 
 ---
 
 ### IAM Least-Privilege Policy
 
-> Describe permissions granted.
+To enforce proper separation of duties and contain blast radius risks, the Lambda's execution role completely avoids the generic `AdministratorAccess` policy. It utilizes a strict, custom least-privilege IAM policy limited to:
+* **`ec2:DescribeSecurityGroups`**: Permission to read current inbound firewall profiles.
+* **`ec2:RevokeSecurityGroupIngress`**: Permission to surgically strip out non-compliant ingress rules.
+* **`logs:CreateLogGroup` / `logs:CreateLogStream` / `logs:PutLogEvents`**: Core logging capabilities for auditing and historical trail preservation.
 
 ---
 
 ### Lambda Screenshot
 
-> Insert screenshots of Lambda code/configuration.
+![alt text](image-43.png)
+![alt text](image-44.png)
+![alt text](image-47.png)
 
 ---
 
@@ -1047,20 +1059,21 @@ fields @timestamp, @message
 
 ### Trigger Type
 
-- EventBridge Rule
-- EventBridge Scheduler
+- [ ] EventBridge Rule
+- [x] EventBridge Scheduler
 
 ---
 
 ### Event Source
 
-> Describe CloudTrail/API event or schedule.
+The execution is wired to an **Amazon EventBridge Scheduler** cron policy. For the demonstration phase, the scheduler is throttled down to execute every few minutes to prove active remediation during grading. For true production environments, it is configured as a daily recurring background audit to maintain a clean baseline state.
 
 ---
 
 ### Trigger Screenshot
 
-> Insert screenshots of trigger configuration.
+![alt text](image-48.png)
+![alt text](image-49.png)
 
 ---
 
@@ -1068,31 +1081,49 @@ fields @timestamp, @message
 
 ### Security Violation Scenario
 
-> Describe the intentional security violation.
+To demonstrate the robust automated loop, a manual violation was forced upon the environment. An insecure administrative rule was deliberately appended to the target asset:
+* **Security Group ID:** `sg-0c1085a97f4479ac7`
+* **Security Group Name:** `selfhealing-test`
+* **Injected Violation:** Inbound Protocol `TCP`, Port `22` (SSH), Source CIDR `0.0.0.0/0` (Anywhere) with Rule ID `sgr-055bce34319787083`.
 
 ---
 
 ### Before State (Insecure)
 
-> Insert screenshot showing insecure configuration.
-
+![alt text](image-50.png)
 ---
 
 ### Automated Remediation
 
-> Explain remediation flow.
+Once triggered, the Lambda function captured the state configuration, isolated the rule violation on `sg-0c1085a97f4479ac7`, and printed the following audit confirmation JSON log to CloudWatch while calling the API:
+
+```json
+{
+  "Status": "Revoking dangerous ingress from SG sg-0c1085a97f4479ac7 (selfhealing-test)",
+  "TargetRule": {
+    "IpProtocol": "tcp",
+    "FromPort": 22,
+    "ToPort": 22,
+    "IpRanges": [
+      {
+        "CidrIp": "0.0.0.0/0"
+      }
+    ]
+  }
+}
+```
 
 ---
 
 ### After State (Remediated)
 
-> Insert screenshot showing fixed configuration.
+![alt text](image-51.png)
 
 ---
 
 ### CloudTrail Evidence
 
-> Insert screenshots showing remediation API calls.
+![alt text](image-52.png)
 
 ---
 
@@ -1100,27 +1131,9 @@ fields @timestamp, @message
 
 ## Selected Path
 
-- Path A — KMS Customer Managed Key
-- Path B — S3 Block Public Access + Deny Policy
-- Path C — IAM Access Analyzer
-
----
-
-## Path A — KMS Customer Managed Key
-
-### CMK Configuration
-
-| Setting          | Value |
-| ---------------- | ----- |
-| Key Alias        |       |
-| Rotation Enabled |       |
-| Applied Service  |       |
-
----
-
-### Encryption Usage Evidence
-
-> Insert screenshots and CloudTrail evidence.
+- [ ] Path A — KMS Customer Managed Key
+- [x] Path B — S3 Block Public Access + Deny Policy
+- [ ] Path C — IAM Access Analyzer
 
 ---
 
@@ -1128,49 +1141,82 @@ fields @timestamp, @message
 
 ### Account-Level Block Public Access
 
-> Insert screenshots showing all settings enabled.
+To proactively neutralize the risk of accidental bucket exposure via misconfigured Access Control Lists (ACLs) or loose bucket-level updates, **S3 Block Public Access** has been fully enabled at the root AWS Account level. All four core structural configuration options are turned on:
+1. Block public ACLs for new buckets and objects.
+2. Remove public ACLs for existing buckets and objects.
+3. Block public bucket policies for new buckets.
+4. Block public and cross-account access for buckets with public policies.
 
 ---
 
 ### Bucket Policy
 
 ```json
-// Insert deny policy here
+{
+  "Id": "PolicyForCloudFrontPrivateContent",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowCloudFrontServicePrincipal",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "cloudfront.amazonaws.com"
+      },
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::group2-car-frontend-dev/*",
+      "Condition": {
+        "StringEquals": {
+          "AWS:SourceArn": "arn:aws:cloudfront::462972379716:distribution/EBLC5THV5AEAZ"
+        }
+      }
+    },
+    {
+      "Sid": "DenyNonTLSRequests",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::group2-car-frontend-dev",
+        "arn:aws:s3:::group2-car-frontend-dev/*"
+      ],
+      "Condition": {
+        "Bool": {
+          "aws:SecureTransport": "false"
+        }
+      }
+    }
+  ]
+}
 ```
 
 ---
 
 ### Denied Request Evidence
 
-> Insert screenshots showing denied request.
+![alt text](image-53.png)
+![alt text](image-54.png)
+![alt text](image-55.png)
 
 ---
 
-## Path C — IAM Access Analyzer
-
-### Findings
-
-> Describe findings identified.
-
----
-
-### Triage Decision
-
-> Explain whether the access was intended or not.
-
----
 
 ## 5.6 Security-Cost Trade-Off
 
 ### Cost Impact
 
-> Explain the cost of the selected control.
+The combined financial overhead of the selected security measures is exactly USD 0.00 (Free):
+
+Account-Level S3 Block Public Access: Offered as a native, built-in governance platform feature by AWS with zero supplemental subscription or resource management fees.
+
+IAM Bucket Policy Modification: Evaluating structural conditions (aws:SecureTransport) occurs natively inside the AWS IAM policy validation layer and does not generate transactional billing charges.
 
 ---
 
 ### Business Justification
 
-> Explain why the cost is justified.
+The zero-cost profile yields an exceptionally high security return on investment (ROI). Data leaks stemming from exposed S3 static hosting origins represent one of the most common vectors for corporate data exposure. Enforcing centralized account blocks and mandatory TLS encryption completely neutralizes accidental public access vectors and wiretapping risks.
+
+The minimal operational friction—ensuring that deployment pipelines communicate explicitly over TLS-enabled endpoints—is a standard best practice that guarantees the integrity of our front-end distribution.
 
 ---
 
@@ -1178,25 +1224,33 @@ fields @timestamp, @message
 
 ## MH-COST-V Verification
 
-> Summary of demonstrated cost visibility features.
+The implementation of Group G2's cost allocation and tracking architecture has been successfully verified through several automated cloud visibility tools:
+* **Resource Tagging Compliance:** Full structural compliance was demonstrated across all six core billable infrastructure components (EC2, DocumentDB, Lambda, S3, API Gateway, and EFS File Systems). Verification screenshots (Figures 2.1 to 2.3) confirm the successful injection of the four exact mandatory keys: `Owner` (`huutai.ngo2409@gmail.com`), `Environment` (`dev`), `CostCenter` (`G2`), and `Application` (`AAP-CarApp`).
+* **Financial Guardrails and Anomaly Alerts:** AWS Cost Explorer reports were successfully initialized to monitor baseline metrics. Financial boundaries were actively established using an AWS Budget configured with a strict threshold cap of **USD 150.00**. Additionally, an AWS Cost Anomaly Detection monitor (`Group-2-monitor`) was deployed and linked to an alert subscription with a **USD 10.00** threshold to immediately flag abnormal cost drivers, such as the fixed operational overhead of the `Network Firewall` ($10.67).
 
 ---
 
 ## MH-COST-A Verification
 
-> Summary of automated cost control demonstration.
+The operational capability of the active cost containment loop was verified through both scheduled and event-driven testing mechanisms:
+* **Selective Cost Safeguard Loop:** Manual invocation and CloudWatch log validation of the `CostGuard_Stop_Compute` function verified the accuracy of the underlying Python (`boto3`) script. The automation scanned the compute topology and applied selective filtering: it successfully bypassed the protected bastion host (`i-0b11cacc05b1a432e`) containing the `keep=true` metadata tag while forcefully executing a `StopInstances` API command on the untagged nodes `i-01669f35cc53b5899` (`car-backend-huutai-a`) and `i-04caa3aea23b844ed`.
+* **Budget Trigger Chain Validation:** To circumvent sandbox processing delays, a real budget alert event was simulated by publishing an explicit JSON test string to the standard SNS topic (`group2-cost-guard-budget-topic`) via the AWS CLI. Execution logs verified that the Lambda function was triggered successfully via the SNS endpoint principal (`sns.amazonaws.com`), confirming that the cost-driven remediation loop is wired correctly and fully operational.
 
 ---
 
 ## MH-OBS Verification
 
-> Summary of monitoring and observability evidence.
+The telemetry and application monitoring engine for the vehicle search layer has been successfully verified:
+* **Log-Based Telemetry Pipeline:** The implementation proved that the isolated private subnet restrictions were overcome by deploying a decoupled **Log-Based Custom Metric architecture**. The backend search Lambda successfully emitted rapid JSON metric data directly to `stdout`, allowing a CloudWatch Metric Filter to capture and parse the `$.latency_value` without introducing execution timeouts or requiring a public NAT route.
+* **Dashboard and Alarm Visualization:** The aggregated custom performance metrics were successfully mapped onto the centralized **CarSales-Performance-Dashboard**, providing real-time line widget visibility into database query latency (`CarSearchLatencyMs`). System resilience was confirmed by the active deployment of a `Lambda-Errors-Alarm` configured to watch standard execution failure counts and transition cleanly into an active state when threshold parameters are crossed.
 
 ---
 
 ## MH-SEC Verification
 
-> Summary of self-healing security remediation evidence.
+The automated reactive and preventative security posture for the workload has been completely verified:
+* **Self-Healing Firewall Remediation:** Active reactive defense was proven by injecting an intentional security violation—introducing an unconfined inbound SSH rule (Port 22 open to `0.0.0.0/0`) on the target testing security group (`sg-0c1085a97f4479ac7`). Upon execution via the EventBridge Scheduler, the `SecurityGuard_SelfHealing` function successfully captured the event, parsed the breach, and programmatically triggered the `RevokeSecurityGroupIngress` API. This completely removed the dangerous rule and restored the firewall to a compliant state, verified by immutable AWS CloudTrail audit logs.
+* **Preventative Data Edge Controls:** Implementation of Path B verified robust perimeter data security. All four account-level S3 Block Public Access variables were toggled on. Furthermore, the frontend bucket (`group2-car-frontend-dev`) was locked down via an explicit bucket policy restricting read paths to the CloudFront distribution origin (`EBLC5THV5AEAZ`). The policy's automated `DenyNonTLSRequests` layer was successfully verified using the AWS CLI, throwing a definitive `AccessDenied` response when unencrypted HTTP uploads were attempted over port 80 while allowing secure HTTPS commands to proceed normally.
 
 ---
 
@@ -1204,104 +1258,75 @@ fields @timestamp, @message
 
 ## Operational Challenges
 
-> Describe major operational issues encountered.
+During the design, redeployment, and validation phases of the `AAP-CarApp` architecture, Group G2 encountered several critical operational roadblocks that impacted system runtime, metrics generation, and compliance bounds:
+
+1. **VPC Isolation and Database Connection Deadlocks:** Placing the backend `CarSales-Search-Service` Lambda function and the Amazon DocumentDB cluster within fully isolated Private Subnets introduced critical execution issues. By default, the PyMongo driver attempted to perform an automated replica set topology discovery loop. Because the AWS Lab environment blocks arbitrary cross-subnet multi-AZ topology scans, the driver hit an unresolved routing loop, leading to consistent 30-second execution timeouts and sifting through broken connections.
+
+2. **Metrics Pipeline Blocking & Subnet Architecture Restrictions:** The initial monitoring strategy relied on calling the standard AWS SDK API `cloudwatch.put_metric_data` synchronously from within the Lambda function code to track operational latency. However, since the private subnets lacked an outbound NAT Gateway or a dedicated VPC Endpoint for CloudWatch, the data packets became trapped inside the private network boundary. This network blockage caused the Lambda functions to hang indefinitely, introducing unnatural transaction latency.
+
+3. **Human Configuration Error and Rapid Port Exposure:** During intensive live test intervals, human error led to the accidental addition of insecure Security Group ingress rules, opening up management ports (such as SSH Port 22 and RDP Port 3389) directly to the public internet (`0.0.0.0/0`). This immediately violated enterprise infrastructure compliance rules and highlighted how quickly vulnerable attack paths can appear on the public network edge when relying on manual human administration.
 
 ---
 
 ## Improvements Made
 
-> Describe optimizations and fixes implemented.
+To resolve these challenges, Group G2 refactored the infrastructure and code logic to incorporate non-blocking, event-driven, and highly resilient design configurations:
+
+1. **Driver Optimization & Timeout Hardening:** The backend database connection script was optimized by injecting the `directConnection=True` configuration parameter directly into the PyMongo `MongoClient` client block. This bypassed the restrictive topology sweep and forced an instant, linear connection path to the DocumentDB primary instance endpoint. Concurrently, network socket wait thresholds (`connectTimeoutMS`, `socketTimeoutMS`, `serverSelectionTimeoutMS`) were lowered to a strict 2000ms, ensuring that any connection faults drop instantly rather than driving up unneeded Lambda billing runtimes.
+
+2. **Decoupled Log-Based Custom Metric Architecture:** To circumvent the lack of public internet routes within the isolated private subnets, the team eliminated all direct synchronous API calls to CloudWatch from the application tier. Instead, a decoupled **Log-Based Custom Metric** pipeline was established. The Lambda script was updated to simply print lightweight, structured JSON strings (e.g., matching the `CarSearchLatencyMs` metric name) directly to standard output (`stdout`), which executes in less than 1ms. A CloudWatch **Metric Filter** was then configured at the Log Group layer to asynchronously scan the incoming streams, extract the variable values, and dynamically generate the dashboard graphics with zero performance overhead.
+
+3. **Automated Budget Guardrails and Self-Healing Security Filters:** To safeguard the workspace from budget breaches and external entry points, automated remediation mechanisms were successfully deployed. Group G2 implemented an active **`SecurityGuard_SelfHealing`** Lambda loop triggered via an **Amazon EventBridge Scheduler**. The moment an unencrypted administrative route appeared on `sg-0c1085a97f4479ac7`, the Lambda function programmatically called `RevokeSecurityGroupIngress` to tear down the rule. Furthermore, financial guardrails were set using an AWS Cost Budget capped tightly at **USD 150.00**, wired via an SNS topic subscription to handle budget overruns automatically.
 
 ---
 
 ## Production Recommendations
 
-> Explain what would be improved in a real production environment.
+If this car sales infrastructure is transitioned into an enterprise-grade, high-availability production cloud environment, Group G2 recommends deploying the following permanent enhancements:
+
+1. **Establish Dedicated AWS PrivateLink VPC Endpoints:** Instead of utilizing log-parsing workarounds or provisioning expensive NAT Gateways to bypass private subnet boundaries, production environments should deploy native **VPC Interface Endpoints** (AWS PrivateLink) for CloudWatch (`com.amazonaws.us-west-2.logs`), Secrets Manager, and systems management. This ensures that all management and telemetry data packets flow safely across the isolated internal AWS private network backbone, improving transit latency and minimizing data exposure.
+
+2. **Enforce Absolute GitOps Pipelines with Static Security Linters:** All manual mutations through the AWS Management Console must be strictly blocked using IAM permissions. The entire workload configuration must be managed through Declarative **Infrastructure-as-Code (IaC)** templates (such as our verified CloudFormation stack file `infra/w6-self-healing-security-guard.yaml`). Deployment pipelines must run automated static check rules (e.g., `Checkov`, `TFLint`, or `cfn-lint`) to inspect policies and reject any commits that introduce exposed ports or lack mandatory cost allocation tags (`Owner`, `Environment`, `CostCenter`, `Application`).
+
+3. **Implement Database Right-Sizing and Scheduled Compute Suspension:** To manage stateful persistence costs effectively, production DocumentDB configurations should leverage modern clustering rules, such as deploying auto-scaling instance classes or utilizing automated nightly hooks. For development environments, EventBridge automated cron tasks should completely pause DocumentDB instances and auxiliary non-production EC2 servers outside of working hours, ensuring strict compliance with operational cost caps without impacting developer agility.
 
 ---
 
 # Section 8 — Stretch Goals (Optional)
 
-## 8.1 gp2 → gp3 Migration
+## 8.1 CloudFormation template cho một resource W6
 
-### Before Migration
+### Infrastructure-as-Code (IaC) Justification
+To demonstrate structural maturity, infrastructure-as-code discipline, and prepare the environment for Week 7 deployment pipelines, the entire Week 6 Self-Healing Security Guard infrastructure has been fully codified into an AWS CloudFormation template. This ensures that the detection and automated remediation loop can be reliably destroyed, version-controlled, and redeployed across multiple target AWS accounts with zero configuration drift.
 
-> Document gp2 configuration and metrics.
+* **Template File Path:** `infra/w6-self-healing-security-guard.yaml`
+* **Validation Status:** `Successfully validated via AWS CloudFormation CLI linter engine`
 
----
+### Resources Defined in the Template
 
-### After Migration
+The template declares a modular topology consisting of the following core AWS resource blocks:
 
-> Document gp3 configuration and metrics.
+1. **`AWS::Lambda::Function` (Security Guard Lambda Engine):**
+   The core execution runtime running the Python (boto3) code. It acts as the intelligent automation layer that scans inbound security boundaries and intercepts non-compliant changes.
+2. **`AWS::IAM::Role` (Least-Privilege Execution Boundary):**
+   The dedicated identity role that grants the Lambda function temporary security credentials. It strictly confines rights to `ec2:DescribeSecurityGroups`, `ec2:RevokeSecurityGroupIngress`, and CloudWatch logging paths, enforcing a minimal blast radius.
+3. **`AWS::Events::Rule` (EventBridge Event Driven Router):**
+   An EventBridge rule configured to capture API mutations. It actively listens to AWS CloudTrail for management events—specifically intercepting the **`AuthorizeSecurityGroupIngress`** API call—enabling the system to trigger the remediation loop instantly whenever a rule is created.
+4. **`AWS::Lambda::Permission` (Invocation Trust Policy):**
+   An explicit resource-based access policy that grants the Amazon EventBridge service principal authorization to trigger and invoke the Security Guard Lambda function.
+5. **`AWS::Logs::LogGroup` (Compliant Log Engine):**
+   An explicitly provisioned CloudWatch Log Group dedicated to capturing the Lambda’s standard output. It is configured with an active retention policy to minimize log storage costs while preserving the security audit trail.
 
----
+### Compliance Filtering Logic Codified
 
-### Cost & Performance Analysis
+The template injects environment variables and rules that instruct the automated remediation logic to evaluate ingress records against the following explicit security thresholds:
 
-> Compare before/after results.
+* **Linux Attack Vector:** Protocol `TCP`, Port `22` (SSH) sourced from `0.0.0.0/0` (IPv4 Anywhere) or `::/0` (IPv6 Anywhere).
+* **Windows Attack Vector:** Protocol `TCP`, Port `3389` (RDP) sourced from `0.0.0.0/0` (IPv4 Anywhere) or `::/0` (IPv6 Anywhere).
 
----
+If an administrative firewall opening matches either criteria, the function bypasses manual notifications and immediately invokes the **`RevokeSecurityGroupIngress`** API to forcefully tear down the dangerous entry path, restoring the security group to a secure state.
 
-## 8.2 Trusted Advisor Remediations
+### Screenshot
 
-### Finding 1
-
-| Item         | Details |
-| ------------ | ------- |
-| Finding      |         |
-| Action Taken |         |
-| Result       |         |
-
----
-
-### Finding 2
-
-| Item         | Details |
-| ------------ | ------- |
-| Finding      |         |
-| Action Taken |         |
-| Result       |         |
-
----
-
-## 8.3 RI / Savings Plans Analysis
-
-### Break-Even Analysis
-
-> Document calculations and recommendation.
-
----
-
-## 8.4 Wasteful → Changed Reflection
-
-> Write a 100–150 word reflection describing waste identified and optimization performed.
-
----
-
-## 8.5 Cost Anomaly Automation
-
-### Configuration
-
-> Describe Cost Anomaly Detection setup.
-
----
-
-### Alert Flow
-
-> Explain EventBridge → SNS integration.
-
----
-
-## 8.6 Config Conformance Pack
-
-### Conformance Pack Used
-
-> Specify selected conformance pack.
-
----
-
-### Compliance Findings
-
-> Summarize important findings.
-
----
+![alt text](image-56.png)
+![alt text](image-57.png)
