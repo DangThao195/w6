@@ -1100,8 +1100,9 @@ This advanced analytical query scans system execution logs to filter and parse t
 
 ```sql
 fields @timestamp, @message
-| filter @message like /START|END|REPORT|ERROR|Exception|Task timed out|Runtime/
-| stats count(*) as log_count by bin(5m)
+| filter @message like /CarSearchLatencyMs/
+| parse @message /"latency_value":\s*(?<latency_value>\d+)/
+| stats count(*) as TotalSearches, avg(latency_value) as AvgLatencyMs, max(latency_value) as MaxLatencyMs by bin(5m)
 | sort @timestamp desc
 ```
 
@@ -1110,7 +1111,7 @@ fields @timestamp, @message
 ### Query Results Screenshot
 
 ![alt text](image-16.png)
-![alt text](image-17.png)
+![alt text](image-74.png)
 
 ---
 
