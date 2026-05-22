@@ -980,6 +980,139 @@ This implementation helps keep the workshop account under the $150 cost cap and 
 
 ## 4.2 CloudWatch Dashboard
 
+### Code Lambda
+
+``` python
+import os
+import time
+import json
+import boto3
+from urllib.parse import quote_plus
+from pymongo import MongoClient
+from botocore.config import Config
+
+aws_config = Config(
+    connect_timeout=3,
+    read_timeout=3,
+    retries={"max_attempts": 1}
+)
+
+secrets_client = boto3.client(
+    "secretsmanager",
+    region_name="us-west-2",
+    config=aws_config
+)
+
+_cached_secret = None
+
+
+def get_docdb_secret():
+    global _cached_secret
+
+    if _cached_secret:
+        return _cached_secret
+
+    secret_name = os.environ.get("SECRET_NAME", "group2/car/docdb")
+    print(f"[INFO] Reading DocumentDB secret from Secrets Manager: {secret_name}")
+
+    response = secrets_client.get_secret_value(SecretId=secret_name)
+    _cached_secret = json.loads(response["SecretString"])
+    return _cached_secret
+
+
+def get_value(secret, *keys):
+    for key in keys:
+        value = str(secret.get(key, "")).strip()
+        if value:
+            return value
+    return ""
+
+
+def lambda_handler(event, context):
+    start_time = time.time()
+
+    try:
+        print("[INFO] Loading DocumentDB credentials from Secrets Manager...")
+
+        secret = get_docdb_secret()
+
+        host = get_value(secret, "DOCDB_HOST", "host")
+        user = get_value(secret, "DOCDB_USER", "username")
+        password = get_value(secret, "DOCDB_PASS", "password")
+        db_name = get_value(secret, "DOCDB_DB", "database") or os.environ.get("DB_NAME", "social")
+        ca_file = get_value(secret, "DOCDB_CA_FILE", "ca_file") or "global-bundle.pem"
+
+        if not host:
+            raise Exception("DOCDB_HOST is missing in Secrets Manager")
+        if not user:
+            raise Exception("DOCDB_USER is missing in Secrets Manager")
+        if not password:
+            raise Exception("DOCDB_PASS is missing in Secrets Manager")
+
+        mongo_uri = (
+            f"mongodb://{quote_plus(user)}:{quote_plus(password)}@{host}:27017/{db_name}"
+            f"?retryWrites=false"
+        )
+
+        print("[INFO] Attempting to connect to DocumentDB...")
+        print(f"[INFO] Target database: {db_name}")
+
+        client = MongoClient(
+            mongo_uri,
+            tls=True,
+            tlsCAFile=ca_file,
+            serverSelectionTimeoutMS=3000,
+            connectTimeoutMS=3000,
+            socketTimeoutMS=3000,
+            directConnection=True,
+            authSource="admin",
+            authMechanism="SCRAM-SHA-1"
+        )
+
+        db = client[db_name]
+
+        query_params = event.get("queryStringParameters") or {}
+        keyword = query_params.get("keyword", "")
+
+        print(f"[INFO] User started searching for car with keyword: {keyword}")
+        print("[INFO] Fetching collection names from real DocumentDB...")
+
+        collections = db.list_collection_names()
+
+        print(f"[INFO] Connection established successfully! Collections in DB: {collections}")
+
+        latency_ms = int((time.time() - start_time) * 1000)
+
+        print(json.dumps({
+            "metric_name": "CarSearchLatencyMs",
+            "latency_value": latency_ms
+        }))
+
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({
+                "status": "success",
+                "database_connected": True,
+                "database": db_name,
+                "available_collections": collections,
+                "latency_ms": latency_ms
+            })
+        }
+
+    except Exception as e:
+        print(f"[ERROR] Detailed failure: {str(e)}")
+
+        return {
+            "statusCode": 500,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({
+                "error": "Internal Server Error",
+                "details": str(e)
+            })
+        }
+```
+
 ### Dashboard Overview
 
 The **CarSales-Performance-Dashboard** is designed to provide a comprehensive view of the health and operational efficiency of the vehicle search system. It integrates both core Infrastructure Metrics and custom Application Performance Metrics to enable rapid anomaly detection and proactive troubleshooting.
@@ -1086,7 +1219,7 @@ print(json.dumps({
 
 ### Saved Query Name
 
-CarSales-Latency-Deep-Analysis
+thao
 
 ---
 
