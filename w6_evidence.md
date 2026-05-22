@@ -216,16 +216,16 @@ Several issues identified during the W5 review were resolved and improved:
 - Re-ran restore validation to ensure restored data matched original written files
 - Verified backup integrity after restore testing
 
-- Vault - Backup Plan - Restore Job
+**Vault - Backup Plan - Restore Job**
 ![alt text](image-6.png)
 ![alt text](image-7.png)
 ![alt text](image-8.png)
 
-- EFS Restore
+**EFS Restore**
 ![alt text](image-5.png)
 ![alt text](image-4.png)
 
-- ABS Restore
+**ABS Restore**
 ![alt text](image-1.png)
 ![alt text](image-2.png)
 ![alt text](image-3.png)
