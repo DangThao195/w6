@@ -407,7 +407,7 @@ The W5 feedback was addressed by moving database credentials out of Lambda envir
 | Tag Key | Allowed Values |
 |---|---|
 | **Owner** | `huutai.ngo2409@gmail.com` |
-| **Environment** | `dev` *(Strictly lowercase; Dev, DEV, or development are unauthorized for this evidence pack)* |
+| **Environment** | `dev` |
 | **CostCenter** | `G2` |
 | **Application** | `AAP-CarApp` |
 
