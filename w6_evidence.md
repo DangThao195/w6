@@ -216,11 +216,32 @@ Several issues identified during the W5 review were resolved and improved:
 - Re-ran restore validation to ensure restored data matched original written files
 - Verified backup integrity after restore testing
 
+- Vault - Backup Plan - Restore Job
+![alt text](image-6.png)
+![alt text](image-7.png)
+![alt text](image-8.png)
+
+- EFS Restore
+![alt text](image-5.png)
+![alt text](image-4.png)
+
+- ABS Restore
+![alt text](image-1.png)
+![alt text](image-2.png)
+![alt text](image-3.png)
+![alt text](image.png)
+
 ### Network Firewall Improvements
 
 - Extended AWS Network Firewall coverage beyond Zone A
 - Removed direct outbound NAT access from private subnets in other Availability Zones
 - Improved inspection routing consistency across multi-AZ architecture
+
+![alt text](image-9.png)
+![alt text](image-10.png)
+![alt text](image-11.png)
+![alt text](image-12.png)
+![alt text](image-13.png)
 
 ### IAM & Secrets Management Improvements
 
@@ -488,11 +509,11 @@ Several issues identified during the W5 review were resolved and improved:
 ### Application Components Monitored
 
 - API Gateway
-- Lambda
-- Database
+- Lambda (CarSales-Search-Service)
+- Database (Amazon DocumentDB)
 - AI Recommendation Layer
 - Vehicle Search Service
-- Other:
+- Other: CloudWatch Logs & Metrics Engine
 
 ---
 
@@ -500,7 +521,12 @@ Several issues identified during the W5 review were resolved and improved:
 
 ### Dashboard Overview
 
-> Describe dashboard purpose and widgets.
+The **CarSales-Performance-Dashboard** is designed to provide a comprehensive view of the health and operational efficiency of the vehicle search system. It integrates both core Infrastructure Metrics and custom Application Performance Metrics to enable rapid anomaly detection and proactive troubleshooting.
+
+The dashboard includes the following widgets:
+1. **CarSearchLatencyMs (Line Widget):** Monitors real-time latency (in milliseconds) when the Lambda function establishes connections and fetches collection data from the Amazon DocumentDB cluster.
+2. **Lambda Duration (Line Widget):** Tracks the average and maximum execution time of the Lambda function to detect potential VPC networking bottlenecks or driver resolution delays.
+3. **Lambda Errors (Line Widget):** Monitors the count of execution failures (crashes or timeouts) to assess overall system stability.
 
 ---
 
@@ -508,22 +534,22 @@ Several issues identified during the W5 review were resolved and improved:
 
 | Metric Name | Namespace | Unit |
 |---|---|---|
-| | | |
+| `CarSearchLatencyMs` | `CarSalesApp/Operations` | Milliseconds |
 
 ---
 
 ### Standard Metrics
 
-- Lambda Errors
-- API Gateway 4XX/5XX Errors
-- RDS Connections
-- EC2 CPU Utilization
+- Lambda Errors (For `CarSales-Search-Service` function)
+- Lambda Duration (`CarSales-Search-Service` Execution Time)
+- Amazon DocumentDB Connections (Monitoring open connections within the Private Subnets)
 
 ---
 
 ### Dashboard Screenshot
 
-> Insert dashboard screenshot.
+![alt text](image-18.png)
+![alt text](image-19.png)
 
 ---
 
@@ -531,14 +557,30 @@ Several issues identified during the W5 review were resolved and improved:
 
 ### Metric Description
 
-> Explain what business/application metric is being tracked.
+The tracked metric is **CarSearchLatencyMs**. It measures the total end-to-end duration (in milliseconds) from the moment the Lambda function receives a search request, establishes a secure TLS handshake across the internal VPC network to the Primary Instance of Amazon DocumentDB, and successfully returns the collection names.
+
+Since the Lambda function resides inside a Private Subnet without public Internet access, calling the native `put_metric_data` API would block execution and cause execution timeouts. To solve this, a highly optimized **Log-Based Custom Metric architecture** was implemented. The Lambda function logs structured data in JSON format to CloudWatch Logs, and a **Metric Filter** automatically parses the `$.latency_value` property to publish a dynamic custom metric.
 
 ---
 
 ### PutMetricData Code Snippet
 
 ```python
-# Insert PutMetricData code here
+# Structured JSON logging snippet used for Metric Filter value extraction
+import json
+import time
+
+start_time = time.time()
+
+# ... Connection logic and db.list_collection_names() from DocumentDB ...
+
+latency_ms = int((time.time() - start_time) * 1000)
+
+# Print structured JSON to stdout for CloudWatch Logs Engine to capture $.latency_value
+print(json.dumps({
+    "metric_name": "CarSearchLatencyMs", 
+    "latency_value": latency_ms
+}))
 ```
 
 ---
@@ -549,11 +591,11 @@ Several issues identified during the W5 review were resolved and improved:
 
 | Setting | Value |
 |---|---|
-| Alarm Name | |
-| Metric | |
-| Threshold | |
-| Evaluation Period | |
-| Alarm Action | |
+| Alarm Name | Lambda-Errors-Alarm |
+| Metric | Errors (Standard Lambda Metric) |
+| Threshold | Greater/equal (>=) 5 errors within 5 minute |
+| Evaluation Period | 5 minute (Statistic: Sum) |
+| Alarm Action | None / SNS Notification Topic |
 
 ---
 
@@ -566,7 +608,8 @@ Several issues identified during the W5 review were resolved and improved:
 
 ### Alarm Screenshot
 
-> Insert screenshots showing alarm configuration and state.
+![alt text](image-14.png)
+![alt text](image-15.png)
 
 ---
 
@@ -574,33 +617,37 @@ Several issues identified during the W5 review were resolved and improved:
 
 ### Log Group
 
-> Specify log group used.
+/aws/lambda/CarSales-Search-Service
 
 ---
 
 ### Saved Query Name
 
-> Enter saved query name.
+CarSales-Latency-Deep-Analysis
 
 ---
 
 ### Query Purpose
 
-> Explain what the query analyzes.
+This advanced analytical query scans system execution logs to filter and parse the latency_value attribute from the structured JSON stream. The extracted data points are aggregated into 5-minute time buckets (bin(5m)) to compute: Total Search Volume (TotalSearches), Average Latency (AvgLatencyMs), and Peak Latency (MaxLatencyMs). This allows engineers to easily isolate database connection degradation or spike periods during high traffic.
 
 ---
 
 ### Logs Insights Query
 
 ```sql
-# Insert Logs Insights query here
+fields @timestamp, @message
+| filter @message like /START|END|REPORT|ERROR|Exception|Task timed out|Runtime/
+| stats count(*) as log_count by bin(5m)
+| sort @timestamp desc
 ```
 
 ---
 
 ### Query Results Screenshot
 
-> Insert screenshot showing query results.
+![alt text](image-16.png)
+![alt text](image-17.png)
 
 ---
 
