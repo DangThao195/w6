@@ -273,10 +273,10 @@ Several issues identified during the W5 review were resolved and improved:
 
 | Tag Key | Example Value | Purpose |
 |---|---|---|
-| Owner | teamlead@email.com | Resource ownership |
-| Environment | dev | Environment identification |
-| CostCenter | G2 | Team cost tracking |
-| Application | CarSalesSystem | Application grouping |
+| **Owner** | `huutai.ngo2409@gmail.com` | Identifies the accountable person if a resource is misconfigured, expensive, or left running. |
+| **Environment** | `dev` | Separates the workshop/development stack from future test, staging, or production resources. |
+| **CostCenter** | `G2` | Attributes cloud cost to the correct project group (Group 2). |
+| **Application** | `AAP-CarApp` | Groups all resources belonging to the same workload across different AWS services. |
 
 ---
 
@@ -284,16 +284,21 @@ Several issues identified during the W5 review were resolved and improved:
 
 | Tag Key | Allowed Values |
 |---|---|
-| Owner | |
-| Environment | dev, test, prod |
-| CostCenter | G2 |
-| Application | CarSalesSystem |
+| **Owner** | `huutai.ngo2409@gmail.com` |
+| **Environment** | `dev` *(Strictly lowercase; Dev, DEV, or development are unauthorized for this evidence pack)* |
+| **CostCenter** | `G2` |
+| **Application** | `AAP-CarApp` |
 
 ---
 
 ### Tagging Enforcement Strategy
 
-> Explain how tag consistency would be enforced in a production environment.
+In a production enterprise environment, maintaining manual tag compliance is highly error-prone. To guarantee full financial accountability, the following layered automation enforcement strategy is designed:
+1. **Organizational Governance:** Implement **AWS Organizations Tag Policies** to globally standardize capitalizations and restrict allowed values, blocking non-compliant structures at the root.
+2. **Infrastructure as Code (IaC) Defaults:** Leverage **Terraform** default provider tags or **AWS CDK** aspects to inject mandatory `Owner`, `Environment`, `CostCenter`, and `Application` tags automatically into every provisioned asset.
+3. **CI/CD Quality Gates:** Embed automated validation linter checks (such as `tflint` or `checkov`) inside GitHub Actions deployment pipelines to break the build if mandatory tags are missing.
+4. **Preventative Controls:** Deploy **AWS Organizations Service Control Policies (SCPs)** or strict IAM explicit deny boundaries to actively reject the creation of high-cost services (EC2, RDS, Network Firewalls, NAT Gateways) unless all four target allocation tags are attached to the API creation request.
+5. **Continuous Compliance Auditing:** Run scheduled **AWS Config Rules** paired with a custom **AWS Lambda script** to continually scan existing topologies, automatically marking any untagged assets for remediation and sending instant Slack/Email alerts to the respective group.
 
 ---
 
@@ -301,42 +306,60 @@ Several issues identified during the W5 review were resolved and improved:
 
 ### Tagged Resources
 
-- EC2 Instances
-- RDS Instances
-- Lambda Functions
-- S3 Buckets
-- API Gateway
-- EFS File Systems
+- [x] EC2 Instances
+- [x] DocumentDB
+- [x] Lambda Functions
+- [x] S3 Buckets
+- [x] API Gateway
+- [x] EFS File Systems
+- ...
 
 ---
 
 ### Screenshot Evidence
 
-> Insert screenshots showing tags applied to at least 3 resource types.
+![alt text](image-32.png)
+![alt text](image-33.png)
+![alt text](image-34.png)
+![alt text](image-35.png)
+![alt text](image-36.png)
 
 ---
 
-## 2.3 Cost Allocation Tags Activation
-
-### Billing Console Activation
-
-> Insert screenshots showing activated cost allocation tags.
-
----
-
-## 2.4 Cost Monitoring Tools
+## 2.3 Cost Monitoring Tools
 
 ### Tool 1 — Cost Explorer
 
-> Describe usage and configuration.
+* **Usage:** Used as the primary visualization engine to dissect cost attribution, track spending trends, and analyze the financial impact of the Week 6 redeployed application stack.
+* **Configuration:** * **Date Range:** Month-to-Date (MTD) / Last 7 Days.
+    * **Granularity:** Daily.
+    * **Dimension / Group by:** Service.
+    * **Filter applied:** Tag: `Application = AAP-CarApp`.
+
+![alt text](image-37.png)
 
 ### Tool 2 — AWS Budgets
 
-> Describe usage and configuration.
+* **Usage:** Functions as an automated financial guardrail to enforce cost control, preventing the sandbox environment from exceeding the weekly allocated cap.
+* **Configuration:**
+    * **Budget Name:** `group2-budget`
+    * **Budget Type:** Cost Budget.
+    * **Budget Limit / Period:** USD 150.00 / Daily tracking baseline.
+    * **Alert Thresholds:** Triggered at **50%**, **80%**, and **100%** of actual cost.
+    * **Notification Subscribers:** `anhnvt.23ite@vku.udn.vn` and `huutai.ngo2409@gmail.com`.
+
+![alt text](image-38.png)
 
 ### Tool 3 — Cost Anomaly Detection (Optional)
 
-> Describe usage and configuration.
+* **Usage:** Leverages AWS machine learning models to continuously inspect underlying usage logs, dynamically identifying unusual spend deviations that standard static thresholds might miss.
+* **Configuration:**
+    * **Monitor Name & Type:** `Group-2-monitor` / AWS Services (All services scope).
+    * **Alert Subscription & Threshold:** `group2` / Alert triggered when an anomaly exceeds a threshold of **USD 10.00**.
+    * **Alert Frequency & Subscriber:** Daily summaries / Sent directly to `huutai.ngo2409@gmail.com`.
+
+![alt text](image-39.png)
+![alt text](image-40.png)
 
 ---
 
@@ -344,7 +367,7 @@ Several issues identified during the W5 review were resolved and improved:
 
 ### Cost Breakdown Screenshot
 
-> Insert screenshot filtered by project tags.
+![alt text](image-41.png)
 
 ---
 
@@ -352,15 +375,17 @@ Several issues identified during the W5 review were resolved and improved:
 
 | Rank | Service | Estimated Cost | Observation |
 |---|---|---|---|
-| 1 | | | |
-| 2 | | | |
-| 3 | | | |
+| **1** | `Network Firewall` | $10.67 | Represents the single highest cost driver in the architecture. This is caused by the persistent operational status of the firewall endpoints and deep inspection layer deployed during the Week 5 network hardening phase. The cost accumulates continuously even when application search traffic is near zero. |
+| **2** | `EC2-Other` | $1.59 | This category aggregates non-compute auxiliary infrastructure running alongside instances. It encapsulates storage fees for EBS volumes, automated snapshots, NAT Gateway traffic processing, unassigned Elastic IPs, or cross-AZ data transfer overhead. |
+| **3** | `DocumentDB` | $1.58 | Represents the underlying cost for the fully provisioned DocumentDB cluster required to support persistent vehicle metadata, customer queries, and transaction tables. As a database instance, it generates costs continuously as long as it remains provisioned. |
 
 ---
 
 ### Cost Analysis Observation
 
-> Write a short paragraph explaining major cost drivers and unexpected costs.
+- Following a detailed analysis of the AWS Cost Explorer data for the `AAP-CarApp` workload, the total baseline spend is heavily dominated by Network Firewall infrastructure ($10.67), followed by EC2-Other utility costs ($1.59) and DocumentDB instances ($1.58). 
+
+- The primary cost driver, Network Firewall, behaves as a fixed overhead that reflects strict security hardening rules rather than scaling with actual application usage. This is standard behavior for perimeter defense architectures, though expensive for isolated development environments. The secondary driver, EC2-Other, highlights that ancillary storage (EBS) and data transfer paths generate billable metrics independently of whether the core EC2 instance runtimes are active. DocumentDB acts as an expected operational cost for stateful persistence, representing an area where infrastructure right-sizing or off-hours cluster suspension can be applied to capture further cost efficiencies.
 
 ---
 
@@ -417,7 +442,6 @@ No administrative, destructive, or modification rights (such as `ec2:TerminateIn
 ### Lambda Screenshot
 
 ![alt text](image-21.png)
-![alt text](image-22.png)
 ![alt text](image-23.png)
 ![alt text](image-24.png)
 
@@ -637,6 +661,7 @@ print(json.dumps({
 
 ![alt text](image-14.png)
 ![alt text](image-15.png)
+![alt text](image-31.png)
 
 ---
 
