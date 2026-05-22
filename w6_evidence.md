@@ -430,8 +430,11 @@ import logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-def lambda_handler(event, context):
-    ec2 = boto3.client('ec2')
+
+![alt text](image-21.png)
+![alt text](image-23.png)
+![alt text](ec2_before.jpg)
+![alt text](image-24.png)
 
     logger.info("Scanning for running EC2 instances...")
 
