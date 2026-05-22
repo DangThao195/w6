@@ -263,6 +263,123 @@ Several issues identified during the W5 review were resolved and improved:
     to
   - “Observed Result”
 
+### Lambda & API Gateway Feedback Improvements
+
+This subsection documents the W6 improvements made specifically for the Lambda + API Gateway implementation after the W5 feedback.
+
+#### 1. Removed DocumentDB connection string from Lambda environment variables
+
+The Lambda function no longer stores the full DocumentDB connection string or password in environment variables. It only stores non-sensitive runtime configuration:
+
+```text
+SECRET_NAME=group2/car/docdb
+DB_NAME=social
+USE_MOCK_DATA=false
+```
+
+This reduces credential exposure and allows database credentials to be rotated from AWS Secrets Manager without redeploying the Lambda function.
+
+![W5 Fix 01 — Lambda environment variables without MongoDB URI](./images/w5-fix-01-lambda-env-no-mongodb-uri.png)
+
+#### 2. Stored DocumentDB credentials in AWS Secrets Manager
+
+The DocumentDB connection details are stored in AWS Secrets Manager under:
+
+```text
+group2/car/docdb
+```
+
+The secret value is not exposed in the evidence screenshot.
+
+![W5 Fix 02 — Secrets Manager DocumentDB secret](./images/w5-fix-02-secrets-manager-docdb-secret.png)
+
+#### 3. Updated Lambda code to retrieve the secret at runtime
+
+The Lambda code was updated to read the secret using AWS SDK at runtime. The function uses `SECRET_NAME`, calls `GetSecretValueCommand`, parses the secret, and then builds the DocumentDB connection string internally.
+
+![W5 Fix 03 — Lambda code reads secret using GetSecretValueCommand](./images/w5-fix-03-lambda-code-get-secret-value.png)
+
+#### 4. Added IAM permission to read the specific secret
+
+The Lambda execution role includes a dedicated policy for reading the DocumentDB secret.
+
+```json
+{
+  "Effect": "Allow",
+  "Action": ["secretsmanager:GetSecretValue"],
+  "Resource": "arn:aws:secretsmanager:us-west-2:462972379716:secret:group2/car/docdb*"
+}
+```
+
+This follows least-privilege access because the Lambda only needs permission to read the specific DocumentDB secret.
+
+![W5 Fix 04 — Lambda role includes secret read policy](./images/w5-fix-04-iam-get-secret-value-policy.png)
+
+#### 5. Deployed Lambda inside private VPC subnets
+
+The Lambda function was configured inside the `car-ecommerce-vpc` private application subnets. This allows the Lambda to connect privately to DocumentDB without exposing the database to the public internet.
+
+![W5 Fix 05 — Lambda VPC configuration](./images/w5-fix-05-lambda-vpc-config.png)
+
+#### 6. Rebuilt API Gateway routes for Lambda integration
+
+The REST API exposes only the required demo endpoints:
+
+```text
+GET  /demo/products
+GET  /demo/products/{id}
+POST /demo/request
+OPTIONS routes for CORS preflight
+```
+
+![W5 Fix 06 — API Gateway resources and routes](./images/w5-fix-06-api-gateway-routes.png)
+
+#### 7. Configured API Gateway Usage Plan
+
+The API Gateway Usage Plan was configured to protect the Lambda from excessive traffic:
+
+```text
+Rate limit: 10 requests/second
+Burst limit: 20 requests
+Stage: prod
+```
+
+![W5 Fix 07 — API Gateway usage plan throttle](./images/w5-fix-07-usage-plan-throttle.png)
+
+#### 8. Increased Lambda Reserved Concurrency
+
+The Lambda Reserved Concurrency was increased to:
+
+```text
+Reserved concurrency = 12
+```
+
+This is aligned better with the API Gateway Usage Plan and reduces the risk of valid traffic being throttled by Lambda too early.
+
+![W5 Fix 08 — Lambda reserved concurrency set to 12](./images/w5-fix-08-lambda-reserved-concurrency.png)
+
+#### 9. Validated API through CloudFront domain
+
+The API was tested through the CloudFront application domain. The response returned HTTP 200 and live DocumentDB-backed data.
+
+![W5 Fix 09 — CloudFront API request returns 200](./images/w5-fix-09-api-test-200.png)
+
+#### 10. Removed API key from browser requests
+
+The frontend was updated so the browser no longer sends `x-api-key` directly. Instead, the request goes to the application domain:
+
+```text
+https://nvtank.dev/demo/products?limit=10
+```
+
+The API key is injected by CloudFront as an origin custom header when forwarding requests to API Gateway.
+
+![W5 Fix 10 — Browser Network request without x-api-key](./images/w5-fix-10-browser-network-no-api-key.png)
+
+#### Summary
+
+The W5 feedback was addressed by moving database credentials out of Lambda environment variables, integrating AWS Secrets Manager, granting least-privilege secret access, deploying Lambda inside private VPC subnets, aligning Reserved Concurrency with the API Gateway Usage Plan, and removing direct API key exposure from browser requests.
+
 ---
 
 # Section 2 — MH-COST-V — Cost Visibility & Attribution
